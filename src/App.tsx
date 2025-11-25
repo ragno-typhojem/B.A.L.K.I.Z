@@ -24,11 +24,11 @@ const App = () => {
   const SYSTEM_PROMPT = `Sen Balkız, profesyonel bir Türkçe kadın asistansın. Kısa, öz ve net yanıtlar ver (maksimum 2-3 cümle). Profesyonel ve yardımcı ol.`;
 
   const VOICE_OPTIONS = [
-    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Ramiz' },
-    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Büşra' },
-    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Ebru' },
-    { id: 'ThT5KcBeYPX3keUQqHPh', name: 'Cansu' },
-    { id: 'pNInz6obpgDQGcFmaJgB', name: 'Fatma' }
+    { id: '21m00Tcm4TlvDq8ikWAM', name: '1' },
+    { id: 'EXAVITQu4vr4xnSDxMaL', name: '2' },
+    { id: 'MF3mGyEYCl7XYWbV9V6O', name: '3' },
+    { id: 'ThT5KcBeYPX3keUQqHPh', name: '4' },
+    { id: 'pNInz6obpgDQGcFmaJgB', name: '5' }
   ];
 
   useEffect(() => {
