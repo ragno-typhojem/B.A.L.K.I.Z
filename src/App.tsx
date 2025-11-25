@@ -140,32 +140,64 @@ const App = () => {
     return data.choices[0].message.content;
   };
 
-  const speak = async (text: string): Promise<void> => {
-    setIsSpeaking(true);
-    startAudioVisualization();
-    try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
-        method: 'POST',
-        headers: { 'Accept': 'audio/mpeg', 'Content-Type': 'application/json', 'xi-api-key': ELEVENLABS_API_KEY },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.4, use_speaker_boost: true }
-        })
+const speak = async (text: string): Promise<void> => {
+  setIsSpeaking(true);
+  startAudioVisualization();
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.8,
+          style: 0.4,
+          use_speaker_boost: true
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('ElevenLabs API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        voiceId: selectedVoice
       });
-      if (!response.ok) throw new Error('Audio error');
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      if (!audioRef.current) audioRef.current = new Audio();
-      audioRef.current.src = audioUrl;
-      audioRef.current.onended = () => { setIsSpeaking(false); setAudioLevel(0); URL.revokeObjectURL(audioUrl); };
-      audioRef.current.onerror = () => { setIsSpeaking(false); setAudioLevel(0); };
-      await audioRef.current.play();
-    } catch (error) {
+      throw new Error(`Audio error: ${response.status}`);
+    }
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.src = audioUrl;
+    audioRef.current.onended = () => {
       setIsSpeaking(false);
       setAudioLevel(0);
-    }
-  };
+      URL.revokeObjectURL(audioUrl);
+    };
+    audioRef.current.onerror = (e) => {
+      console.error('Audio playback error:', e);
+      setIsSpeaking(false);
+      setAudioLevel(0);
+    };
+    await audioRef.current.play();
+  } catch (error) {
+    console.error('speak error:', error);
+    setIsSpeaking(false);
+    setAudioLevel(0);
+    throw error;
+  }
+};
+
 
   const stopSpeaking = () => {
     if (audioRef.current) {
