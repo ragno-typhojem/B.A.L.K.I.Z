@@ -167,122 +167,166 @@ const App = () => {
       setTimeout(() => startListening(), 1000);
     }
   };
+const handleUserSpeech = async (text: string) => {
+  if (!text.trim()) {
+    setIsProcessing(false);
+    setTimeout(() => startListening(), 1000);
+    return;
+  }
 
-  const handleUserSpeech = async (text: string) => {
-    if (!text.trim()) {
-      setIsProcessing(false);
-      setTimeout(() => startListening(), 1000);
-      return;
+  try {
+    const aiResponse = await getAIResponse(text);
+    setResponse(aiResponse);
+    await speak(aiResponse);
+  } catch (error) {
+    console.error('❌ Hata:', error);
+
+    // Content policy hatası için özel mesaj
+    let errorMsg = 'Üzgünüm, bir hata oluştu. Pes etmiyorum, tekrar dene!';
+    if (error instanceof Error) {
+      if (error.message.includes('content_policy') || error.message.includes('İçerik politikası')) {
+        errorMsg = 'Seni duyamadım, Farklı bir şey sorar mısın?';
+      }
     }
 
+    setResponse(errorMsg);
+
+    // Ses çıkarmayı dene, başarısız olursa sadece metni göster
     try {
-      const aiResponse = await getAIResponse(text);
-      setResponse(aiResponse);
-      await speak(aiResponse);
-    } catch (error) {
-      const errorMsg = 'Üzgünüm, bir hata oluştu. Ama pes etmiyorum.';
-      setResponse(errorMsg);
       await speak(errorMsg);
-    } finally {
-      setIsProcessing(false);
-      setTranscript('');
-      setTimeout(() => startListening(), 1000);
+    } catch (speakError) {
+      console.error('❌ Ses de başarısız:', speakError);
+      // Ses çıkmasa da devam et
     }
-  };
+  } finally {
+    setIsProcessing(false);
+    setTranscript('');
+    setTimeout(() => startListening(), 1000);
+  }
+};
 
-  const getAIResponse = async (userMessage: string): Promise<string> => {
-    try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: userMessage }
-          ],
-          max_tokens: 200,
-          temperature: 0.7,
-        }),
+const getAIResponse = async (userMessage: string): Promise<string> => {
+  try {
+    console.log('🤖 AI isteği gönderiliyor...');
+    console.log('📝 Kullanıcı mesajı:', userMessage);
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-70b-versatile',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMessage }
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      }),
+    });
+
+    console.log('📊 Groq Response Status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('❌ Groq API Hatası:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Groq API Hatası:', response.status, errorText);
-        throw new Error(`AI error: ${response.status}`);
+      // Content policy hatası kontrolü
+      if (errorData.error?.message?.includes('content_policy')) {
+        throw new Error('İçerik politikası ihlali - farklı bir şey dene');
       }
 
-      const data = await response.json();
-      return data.choices[0].message.content;
-    } catch (error) {
-      console.error('❌ AI Yanıt Hatası:', error);
-      throw error;
+      throw new Error(`AI error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
-  };
 
-  const speak = async (text: string): Promise<void> => {
-    setIsSpeaking(true);
-    startAudioVisualization();
-    try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': ELEVENLABS_API_KEY
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.4,
-            use_speaker_boost: true
-          }
-        })
+    const data = await response.json();
+    console.log('✅ AI Yanıt:', data.choices[0].message.content);
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('❌ AI Yanıt Hatası:', error);
+    throw error;
+  }
+};
+
+const speak = async (text: string): Promise<void> => {
+  setIsSpeaking(true);
+  startAudioVisualization();
+  try {
+    console.log('🔊 TTS isteği gönderiliyor...');
+    console.log('📝 Konuşulacak metin:', text);
+
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.8,
+          style: 0.4,
+          use_speaker_boost: true
+        }
+      })
+    });
+
+    console.log('📊 ElevenLabs Response Status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('❌ ElevenLabs API Hatası:', {
+        status: response.status,
+        error: errorData,
+        voiceId: selectedVoice
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ ElevenLabs API Hatası:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-          voiceId: selectedVoice
-        });
-        throw new Error(`Audio error: ${response.status}`);
+      // Content policy hatası kontrolü
+      if (errorData.detail?.status === 'content_policy_violation') {
+        throw new Error('İçerik politikası ihlali - metin filtrelendi');
       }
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+      throw new Error(`Audio error: ${response.status}`);
+    }
 
-      if (!audioRef.current) audioRef.current = new Audio();
-      audioRef.current.src = audioUrl;
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
 
-      audioRef.current.onended = () => {
-        setIsSpeaking(false);
-        setAudioLevel(0);
-        URL.revokeObjectURL(audioUrl);
-      };
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.src = audioUrl;
 
-      audioRef.current.onerror = (e) => {
-        console.error('❌ Ses Oynatma Hatası:', e);
-        setIsSpeaking(false);
-        setAudioLevel(0);
-      };
-
-      await audioRef.current.play();
-    } catch (error) {
-      console.error('❌ Konuşma Hatası:', error);
+    audioRef.current.onended = () => {
+      console.log('✅ Ses tamamlandı');
       setIsSpeaking(false);
       setAudioLevel(0);
-      throw error;
-    }
-  };
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    audioRef.current.onerror = (e) => {
+      console.error('❌ Ses Oynatma Hatası:', e);
+      setIsSpeaking(false);
+      setAudioLevel(0);
+    };
+
+    await audioRef.current.play();
+    console.log('▶️ Ses oynatılıyor...');
+  } catch (error) {
+    console.error('❌ Konuşma Hatası:', error);
+    setIsSpeaking(false);
+    setAudioLevel(0);
+    throw error;
+  }
+};
+
 
   const stopSpeaking = () => {
     if (audioRef.current) {
