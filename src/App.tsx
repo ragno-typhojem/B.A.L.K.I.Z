@@ -273,9 +273,11 @@ const App = () => {
     }
   };
 
-  const speak = async (text: string): Promise<void> => {
-    setIsSpeaking(true);
-    startAudioVisualization();
+ const speak = async (text: string): Promise<void> => {
+  setIsSpeaking(true);
+  startAudioVisualization();
+
+  return new Promise(async (resolve, reject) => {
     try {
       console.log('🔊 TTS isteği gönderiliyor...');
       console.log('📝 Konuşulacak metin:', text);
@@ -308,37 +310,66 @@ const App = () => {
           error: errorData,
           voiceId: selectedVoice
         });
-        throw new Error(`Audio error: ${response.status}`);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+        reject(new Error(`Audio error: ${response.status}`));
+        return;
       }
 
       const audioBlob = await response.blob();
+      console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
 
+      // ✅ Promise ile FileReader'ı bekle
       const reader = new FileReader();
+
       reader.onloadend = () => {
         const base64Audio = reader.result as string;
+        console.log('✅ Base64 dönüştürme tamamlandı, uzunluk:', base64Audio.length);
 
-        if (!audioRef.current) audioRef.current = new Audio();
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+        }
+
         audioRef.current.src = base64Audio;
 
         audioRef.current.onended = () => {
           console.log('✅ Ses tamamlandı');
           setIsSpeaking(false);
           setAudioLevel(0);
+          resolve();
         };
 
         audioRef.current.onerror = (e) => {
           console.error('❌ Ses Oynatma Hatası:', e);
+          console.error('Audio src:', audioRef.current?.src?.substring(0, 100));
           setIsSpeaking(false);
           setAudioLevel(0);
+          reject(new Error('Audio playback failed'));
         };
 
-        audioRef.current.play().catch(err => {
-          console.error('❌ Play hatası:', err);
-          setIsSpeaking(false);
-          setAudioLevel(0);
-        });
+        console.log('▶️ Ses oynatılmaya çalışılıyor...');
+        audioRef.current.play()
+          .then(() => {
+            console.log('✅ Ses oynatma başladı');
+          })
+          .catch(err => {
+            console.error('❌ Play hatası:', err);
+            console.error('Hata detayı:', {
+              name: err.name,
+              message: err.message,
+              code: err.code
+            });
+            setIsSpeaking(false);
+            setAudioLevel(0);
+            reject(err);
+          });
+      };
 
-        console.log('▶️ Ses oynatılıyor...');
+      reader.onerror = (e) => {
+        console.error('❌ FileReader hatası:', e);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+        reject(new Error('FileReader failed'));
       };
 
       reader.readAsDataURL(audioBlob);
@@ -347,9 +378,11 @@ const App = () => {
       console.error('❌ Konuşma Hatası:', error);
       setIsSpeaking(false);
       setAudioLevel(0);
-      throw error;
+      reject(error);
     }
-  };
+  });
+};
+
 
   const stopSpeaking = () => {
     if (audioRef.current) {
