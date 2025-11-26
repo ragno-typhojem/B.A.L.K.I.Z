@@ -21,12 +21,12 @@ const App = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // ✅ Kayıt süresi için
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldRestartListeningRef = useRef(true); // ✅ Yeniden başlatma kontrolü
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
-  // ✅ Daha insancıl ve bağlamsal prompt
   const SYSTEM_PROMPT = `Sen Balkız, doğal ve samimi bir Türkçe kadın asistansın.
 
 Özellikler:
@@ -36,10 +36,11 @@ const App = () => {
 - Kullanıcının bulunduğu bağlamı anla (zaman, konum, durum)
 
 Örnekler:
+- "Selam" → "Selam! Nasılsın?"
+- "Merhaba" → "Merhaba! Sana nasıl yardımcı olabilirim?"
 - "Hangi şehirdeyiz?" → "Bunu bilemiyorum, ama sen neredesin?"
 - "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}"
 - "Neredesin?" → "Ben dijital bir asistanım, seninle buradayım."
-- "Hava nasıl?" → "Hava durumunu göremiyorum, ama sen nasıl hissediyorsun?"
 
 Önemli: Bilmediğin şeyleri uydurmak yerine dürüst ol ve kullanıcıya sor.`;
 
@@ -74,6 +75,7 @@ const App = () => {
 
     return () => {
       clearInterval(bootInterval);
+      shouldRestartListeningRef.current = false; // ✅ Cleanup'ta durdur
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -110,7 +112,7 @@ const App = () => {
   };
 
   const startListening = async () => {
-    if (!streamRef.current || isProcessing) return;
+    if (!streamRef.current || isProcessing || isSpeaking) return; // ✅ Konuşurken dinleme
 
     try {
       audioChunksRef.current = [];
@@ -123,6 +125,17 @@ const App = () => {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        // ✅ Çok küçük kayıtları atla (gürültü)
+        if (audioBlob.size < 5000) {
+          console.log('⚠️ Kayıt çok küçük, atlanıyor');
+          setIsProcessing(false);
+          if (shouldRestartListeningRef.current) {
+            setTimeout(() => startListening(), 500);
+          }
+          return;
+        }
+
         await transcribeAudio(audioBlob);
       };
 
@@ -131,10 +144,10 @@ const App = () => {
       startAudioVisualization();
       console.log('🎤 Dinleme başladı');
 
-      // ✅ 3 saniye sonra otomatik durdur
+      // ✅ 4 saniye kayıt (daha uzun, daha iyi algılama)
       recordingTimeoutRef.current = setTimeout(() => {
         stopListening();
-      }, 3000);
+      }, 4000);
     } catch (error) {
       console.error('❌ Dinleme başlatma hatası:', error);
       setError('Dinleme başlatılamadı');
@@ -154,7 +167,14 @@ const App = () => {
     }
   };
 
-  const toggleListening = () => (isListening ? stopListening() : startListening());
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      shouldRestartListeningRef.current = true;
+      startListening();
+    }
+  };
 
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsProcessing(true);
@@ -179,25 +199,37 @@ const App = () => {
       }
 
       const data = await response.json();
-      const text = data.text;
+      const text = data.text.trim();
       console.log('📝 Transkript:', text);
-      setTranscript(text);
 
-      // ✅ 800ms gecikme ekle (daha doğal)
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // ✅ Boş veya çok kısa metinleri atla
+      if (!text || text.length < 2) {
+        console.log('⚠️ Metin çok kısa, atlanıyor');
+        setIsProcessing(false);
+        if (shouldRestartListeningRef.current) {
+          setTimeout(() => startListening(), 500);
+        }
+        return;
+      }
+
+      setTranscript(text);
       await handleUserSpeech(text);
     } catch (error) {
       console.error('❌ Transkripsiyon başarısız:', error);
       setError('Ses tanıma başarısız oldu');
       setIsProcessing(false);
-      setTimeout(() => startListening(), 1500);
+      if (shouldRestartListeningRef.current) {
+        setTimeout(() => startListening(), 2000);
+      }
     }
   };
 
   const handleUserSpeech = async (text: string) => {
     if (!text.trim()) {
       setIsProcessing(false);
-      setTimeout(() => startListening(), 1500);
+      if (shouldRestartListeningRef.current) {
+        setTimeout(() => startListening(), 1000);
+      }
       return;
     }
 
@@ -225,7 +257,10 @@ const App = () => {
     } finally {
       setIsProcessing(false);
       setTranscript('');
-      setTimeout(() => startListening(), 1500); // ✅ 1.5 saniye bekle
+      // ✅ Konuşma bittikten SONRA tekrar dinle
+      if (shouldRestartListeningRef.current) {
+        setTimeout(() => startListening(), 2000);
+      }
     }
   };
 
@@ -246,8 +281,8 @@ const App = () => {
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 80, // ✅ 200 → 80 (daha kısa yanıtlar)
-          temperature: 0.8, // ✅ 0.7 → 0.8 (daha yaratıcı)
+          max_tokens: 60, // ✅ 80 → 60 (daha kısa)
+          temperature: 0.8,
         }),
       });
 
@@ -273,67 +308,65 @@ const App = () => {
     }
   };
 
- const speak = async (text: string): Promise<void> => {
-  setIsSpeaking(true);
-  startAudioVisualization();
+  const speak = async (text: string): Promise<void> => {
+    setIsSpeaking(true);
+    startAudioVisualization();
 
-  return new Promise(async (resolve, reject) => {
-    try {
-      console.log('🔊 TTS isteği gönderiliyor...');
-      console.log('📝 Konuşulacak metin:', text);
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log('🔊 TTS isteği gönderiliyor...');
+        console.log('📝 Konuşulacak metin:', text);
 
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': ELEVENLABS_API_KEY
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.4,
-            use_speaker_boost: true
-          }
-        })
-      });
-
-      console.log('📊 ElevenLabs Response Status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('❌ ElevenLabs API Hatası:', {
-          status: response.status,
-          error: errorData,
-          voiceId: selectedVoice
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': ELEVENLABS_API_KEY
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.8,
+              style: 0.4,
+              use_speaker_boost: true
+            }
+          })
         });
-        setIsSpeaking(false);
-        setAudioLevel(0);
-        reject(new Error(`Audio error: ${response.status}`));
-        return;
-      }
 
-      const audioBlob = await response.blob();
-      console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
+        console.log('📊 ElevenLabs Response Status:', response.status);
 
-      // ✅ Promise ile FileReader'ı bekle
-      const reader = new FileReader();
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('❌ ElevenLabs API Hatası:', {
+            status: response.status,
+            error: errorData,
+            voiceId: selectedVoice
+          });
+          setIsSpeaking(false);
+          setAudioLevel(0);
+          reject(new Error(`Audio error: ${response.status}`));
+          return;
+        }
 
-      reader.onloadend = () => {
-        const base64Audio = reader.result as string;
-        console.log('✅ Base64 dönüştürme tamamlandı, uzunluk:', base64Audio.length);
+        const audioBlob = await response.blob();
+        console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
+
+        // ✅ Blob URL kullan (CSP sorunu için)
+        const audioUrl = URL.createObjectURL(audioBlob);
+        console.log('🔗 Audio URL oluşturuldu:', audioUrl.substring(0, 50));
 
         if (!audioRef.current) {
           audioRef.current = new Audio();
         }
 
-        audioRef.current.src = base64Audio;
+        audioRef.current.src = audioUrl;
 
         audioRef.current.onended = () => {
           console.log('✅ Ses tamamlandı');
+          URL.revokeObjectURL(audioUrl); // ✅ Memory leak önleme
           setIsSpeaking(false);
           setAudioLevel(0);
           resolve();
@@ -341,7 +374,8 @@ const App = () => {
 
         audioRef.current.onerror = (e) => {
           console.error('❌ Ses Oynatma Hatası:', e);
-          console.error('Audio src:', audioRef.current?.src?.substring(0, 100));
+          console.error('Audio src:', audioRef.current?.src);
+          URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
           setAudioLevel(0);
           reject(new Error('Audio playback failed'));
@@ -356,33 +390,22 @@ const App = () => {
             console.error('❌ Play hatası:', err);
             console.error('Hata detayı:', {
               name: err.name,
-              message: err.message,
-              code: err.code
+              message: err.message
             });
+            URL.revokeObjectURL(audioUrl);
             setIsSpeaking(false);
             setAudioLevel(0);
             reject(err);
           });
-      };
 
-      reader.onerror = (e) => {
-        console.error('❌ FileReader hatası:', e);
+      } catch (error) {
+        console.error('❌ Konuşma Hatası:', error);
         setIsSpeaking(false);
         setAudioLevel(0);
-        reject(new Error('FileReader failed'));
-      };
-
-      reader.readAsDataURL(audioBlob);
-
-    } catch (error) {
-      console.error('❌ Konuşma Hatası:', error);
-      setIsSpeaking(false);
-      setAudioLevel(0);
-      reject(error);
-    }
-  });
-};
-
+        reject(error);
+      }
+    });
+  };
 
   const stopSpeaking = () => {
     if (audioRef.current) {
@@ -400,9 +423,7 @@ const App = () => {
     const greetings = [
       'Yeni sesim nasıl?',
       'Merhaba, bu benim yeni tonum.',
-      'Ses değiştirdim, beğendin mi?',
-      'Yeni sesimle selamlar!',
-      'Nasıl, hoşuna gitti mi?'
+      'Ses değiştirdim, beğendin mi?'
     ];
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
     speak(randomGreeting);
