@@ -21,11 +21,27 @@ const App = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // ✅ Kayıt süresi için
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
-  const SYSTEM_PROMPT = `Sen Balkız, profesyonel bir Türkçe kadın asistansın. Kısa, öz ve net yanıtlar ver (maksimum 2-3 cümle). Profesyonel ve yardımcı ol.`;
+  // ✅ Daha insancıl ve bağlamsal prompt
+  const SYSTEM_PROMPT = `Sen Balkız, doğal ve samimi bir Türkçe kadın asistansın.
+
+Özellikler:
+- Kısa ve öz yanıtlar ver (1-2 cümle, maksimum 15 kelime)
+- Samimi ve sıcak bir dil kullan
+- Gereksiz teknik detaylara girme
+- Kullanıcının bulunduğu bağlamı anla (zaman, konum, durum)
+
+Örnekler:
+- "Hangi şehirdeyiz?" → "Bunu bilemiyorum, ama sen neredesin?"
+- "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}"
+- "Neredesin?" → "Ben dijital bir asistanım, seninle buradayım."
+- "Hava nasıl?" → "Hava durumunu göremiyorum, ama sen nasıl hissediyorsun?"
+
+Önemli: Bilmediğin şeyleri uydurmak yerine dürüst ol ve kullanıcıya sor.`;
 
   const VOICE_OPTIONS = [
     { id: '21m00Tcm4TlvDq8ikWAM', name: '1' },
@@ -35,12 +51,11 @@ const App = () => {
     { id: 'pNInz6obpgDQGcFmaJgB', name: '5' }
   ];
 
-  // Boot Screen Effect
   useEffect(() => {
-      console.log('=== DEBUG: ENV VARIABLES ===');
-  console.log('VITE_GROQ_API_KEY:', import.meta.env.VITE_GROQ_API_KEY);
-  console.log('VITE_ELEVENLABS_API_KEY:', import.meta.env.VITE_ELEVENLABS_API_KEY);
-  console.log('All env:', import.meta.env);
+    console.log('=== DEBUG: ENV VARIABLES ===');
+    console.log('VITE_GROQ_API_KEY:', GROQ_API_KEY ? '✅' : '❌');
+    console.log('VITE_ELEVENLABS_API_KEY:', ELEVENLABS_API_KEY ? '✅' : '❌');
+
     const savedVoice = localStorage.getItem('balkiz_voice');
     if (savedVoice) setSelectedVoice(savedVoice);
 
@@ -64,10 +79,10 @@ const App = () => {
       }
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (audioRef.current) audioRef.current.pause();
+      if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
     };
   }, []);
 
-  // Mikrofon başlat
   const initializeAudio = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -115,6 +130,11 @@ const App = () => {
       setIsListening(true);
       startAudioVisualization();
       console.log('🎤 Dinleme başladı');
+
+      // ✅ 3 saniye sonra otomatik durdur
+      recordingTimeoutRef.current = setTimeout(() => {
+        stopListening();
+      }, 3000);
     } catch (error) {
       console.error('❌ Dinleme başlatma hatası:', error);
       setError('Dinleme başlatılamadı');
@@ -126,13 +146,16 @@ const App = () => {
       mediaRecorderRef.current.stop();
       setIsListening(false);
       setAudioLevel(0);
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
       console.log('🛑 Dinleme durduruldu');
     }
   };
 
   const toggleListening = () => (isListening ? stopListening() : startListening());
 
-  // Groq Whisper API ile transkripsiyon
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsProcessing(true);
     try {
@@ -159,177 +182,174 @@ const App = () => {
       const text = data.text;
       console.log('📝 Transkript:', text);
       setTranscript(text);
+
+      // ✅ 800ms gecikme ekle (daha doğal)
+      await new Promise(resolve => setTimeout(resolve, 800));
       await handleUserSpeech(text);
     } catch (error) {
       console.error('❌ Transkripsiyon başarısız:', error);
       setError('Ses tanıma başarısız oldu');
       setIsProcessing(false);
-      setTimeout(() => startListening(), 1000);
+      setTimeout(() => startListening(), 1500);
     }
   };
-const handleUserSpeech = async (text: string) => {
-  if (!text.trim()) {
-    setIsProcessing(false);
-    setTimeout(() => startListening(), 1000);
-    return;
-  }
 
-  try {
-    const aiResponse = await getAIResponse(text);
-    setResponse(aiResponse);
-    await speak(aiResponse);
-  } catch (error) {
-    console.error('❌ Hata:', error);
-
-    // Content policy hatası için özel mesaj
-    let errorMsg = 'Üzgünüm, bir hata oluştu. Pes etmiyorum, tekrar dene!';
-    if (error instanceof Error) {
-      if (error.message.includes('content_policy') || error.message.includes('İçerik politikası')) {
-        errorMsg = 'Seni duyamadım, Farklı bir şey sorar mısın?';
-      }
+  const handleUserSpeech = async (text: string) => {
+    if (!text.trim()) {
+      setIsProcessing(false);
+      setTimeout(() => startListening(), 1500);
+      return;
     }
 
-    setResponse(errorMsg);
-
-    // Ses çıkarmayı dene, başarısız olursa sadece metni göster
     try {
-      await speak(errorMsg);
-    } catch (speakError) {
-      console.error('❌ Ses de başarısız:', speakError);
-      // Ses çıkmasa da devam et
-    }
-  } finally {
-    setIsProcessing(false);
-    setTranscript('');
-    setTimeout(() => startListening(), 1000);
-  }
-};
+      const aiResponse = await getAIResponse(text);
+      setResponse(aiResponse);
+      await speak(aiResponse);
+    } catch (error) {
+      console.error('❌ Hata:', error);
 
-const getAIResponse = async (userMessage: string): Promise<string> => {
-  try {
-    console.log('🤖 AI isteği gönderiliyor...');
-    console.log('📝 Kullanıcı mesajı:', userMessage);
-
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // ✅ YENİ MODEL
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage }
-        ],
-        max_tokens: 200,
-        temperature: 0.7,
-      }),
-    });
-
-    console.log('📊 Groq Response Status:', response.status);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('❌ Groq API Hatası:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData
-      });
-
-      throw new Error(`AI error: ${response.status} - ${JSON.stringify(errorData)}`);
-    }
-
-    const data = await response.json();
-    console.log('✅ AI Yanıt:', data.choices[0].message.content);
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error('❌ AI Yanıt Hatası:', error);
-    throw error;
-  }
-};
-
-
-const speak = async (text: string): Promise<void> => {
-  setIsSpeaking(true);
-  startAudioVisualization();
-  try {
-    console.log('🔊 TTS isteği gönderiliyor...');
-    console.log('📝 Konuşulacak metin:', text);
-
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.8,
-          style: 0.4,
-          use_speaker_boost: true
+      let errorMsg = 'Üzgünüm, seni anlayamadım. Tekrar söyler misin?';
+      if (error instanceof Error) {
+        if (error.message.includes('content_policy') || error.message.includes('İçerik politikası')) {
+          errorMsg = 'Seni duyamadım, farklı bir şey sorar mısın?';
         }
-      })
-    });
+      }
 
-    console.log('📊 ElevenLabs Response Status:', response.status);
+      setResponse(errorMsg);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('❌ ElevenLabs API Hatası:', {
-        status: response.status,
-        error: errorData,
-        voiceId: selectedVoice
-      });
-      throw new Error(`Audio error: ${response.status}`);
+      try {
+        await speak(errorMsg);
+      } catch (speakError) {
+        console.error('❌ Ses de başarısız:', speakError);
+      }
+    } finally {
+      setIsProcessing(false);
+      setTranscript('');
+      setTimeout(() => startListening(), 1500); // ✅ 1.5 saniye bekle
     }
+  };
 
-    const audioBlob = await response.blob();
+  const getAIResponse = async (userMessage: string): Promise<string> => {
+    try {
+      console.log('🤖 AI isteği gönderiliyor...');
+      console.log('📝 Kullanıcı mesajı:', userMessage);
 
-    // ✅ Blob yerine Base64 kullanıyoruz
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64Audio = reader.result as string;
-
-      if (!audioRef.current) audioRef.current = new Audio();
-      audioRef.current.src = base64Audio; // Base64 data URL
-
-      audioRef.current.onended = () => {
-        console.log('✅ Ses tamamlandı');
-        setIsSpeaking(false);
-        setAudioLevel(0);
-      };
-
-      audioRef.current.onerror = (e) => {
-        console.error('❌ Ses Oynatma Hatası:', e);
-        setIsSpeaking(false);
-        setAudioLevel(0);
-      };
-
-      audioRef.current.play().catch(err => {
-        console.error('❌ Play hatası:', err);
-        setIsSpeaking(false);
-        setAudioLevel(0);
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userMessage }
+          ],
+          max_tokens: 80, // ✅ 200 → 80 (daha kısa yanıtlar)
+          temperature: 0.8, // ✅ 0.7 → 0.8 (daha yaratıcı)
+        }),
       });
 
-      console.log('▶️ Ses oynatılıyor...');
-    };
+      console.log('📊 Groq Response Status:', response.status);
 
-    reader.readAsDataURL(audioBlob);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Groq API Hatası:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
 
-  } catch (error) {
-    console.error('❌ Konuşma Hatası:', error);
-    setIsSpeaking(false);
-    setAudioLevel(0);
-    throw error;
-  }
-};
+        throw new Error(`AI error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
 
+      const data = await response.json();
+      console.log('✅ AI Yanıt:', data.choices[0].message.content);
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('❌ AI Yanıt Hatası:', error);
+      throw error;
+    }
+  };
 
+  const speak = async (text: string): Promise<void> => {
+    setIsSpeaking(true);
+    startAudioVisualization();
+    try {
+      console.log('🔊 TTS isteği gönderiliyor...');
+      console.log('📝 Konuşulacak metin:', text);
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.8,
+            style: 0.4,
+            use_speaker_boost: true
+          }
+        })
+      });
+
+      console.log('📊 ElevenLabs Response Status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ ElevenLabs API Hatası:', {
+          status: response.status,
+          error: errorData,
+          voiceId: selectedVoice
+        });
+        throw new Error(`Audio error: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Audio = reader.result as string;
+
+        if (!audioRef.current) audioRef.current = new Audio();
+        audioRef.current.src = base64Audio;
+
+        audioRef.current.onended = () => {
+          console.log('✅ Ses tamamlandı');
+          setIsSpeaking(false);
+          setAudioLevel(0);
+        };
+
+        audioRef.current.onerror = (e) => {
+          console.error('❌ Ses Oynatma Hatası:', e);
+          setIsSpeaking(false);
+          setAudioLevel(0);
+        };
+
+        audioRef.current.play().catch(err => {
+          console.error('❌ Play hatası:', err);
+          setIsSpeaking(false);
+          setAudioLevel(0);
+        });
+
+        console.log('▶️ Ses oynatılıyor...');
+      };
+
+      reader.readAsDataURL(audioBlob);
+
+    } catch (error) {
+      console.error('❌ Konuşma Hatası:', error);
+      setIsSpeaking(false);
+      setAudioLevel(0);
+      throw error;
+    }
+  };
 
   const stopSpeaking = () => {
     if (audioRef.current) {
@@ -345,16 +365,11 @@ const speak = async (text: string): Promise<void> => {
     localStorage.setItem('balkiz_voice', voiceId);
     setShowVoiceMenu(false);
     const greetings = [
-      'Merhaba günün nasıl geçiyor?',
-      'Selam! nasılsın?',
-      'Yeni sesle merhaba, sana nasıl yardımcı olabilirim?',
-      'Balkız hazır — yeni tonda selamlar!',
-      'Yeni sesimde seni dinliyorum, ne istersin?',
-      'Hoş geldin, bu benim yeni sesim.',
-      'Selam, ses değiştirdim — devam edebilirim.',
-      'Yeni tınımla merhaba!',
-      'Ses güncellendi, sorularını bekliyorum.',
-      'Deneme sesim bu, ne düşünüyorsun?'
+      'Yeni sesim nasıl?',
+      'Merhaba, bu benim yeni tonum.',
+      'Ses değiştirdim, beğendin mi?',
+      'Yeni sesimle selamlar!',
+      'Nasıl, hoşuna gitti mi?'
     ];
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
     speak(randomGreeting);
