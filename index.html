@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- ✅ CSP Meta Tag Ekle -->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src *; media-src *; img-src * data:;">
+
+    <!-- ✅ CSP FIX -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://api.elevenlabs.io; media-src 'self' blob: data: https:;">
+
     <title>B.A.L.K.I.Z</title>
   </head>
   <body>
