@@ -285,36 +285,42 @@ const speak = async (text: string): Promise<void> => {
         error: errorData,
         voiceId: selectedVoice
       });
-
-      // Content policy hatası kontrolü
-      if (errorData.detail?.status === 'content_policy_violation') {
-        throw new Error('İçerik politikası ihlali - metin filtrelendi');
-      }
-
       throw new Error(`Audio error: ${response.status}`);
     }
 
     const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
 
-    if (!audioRef.current) audioRef.current = new Audio();
-    audioRef.current.src = audioUrl;
+    // ✅ Blob yerine Base64 kullanıyoruz
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Audio = reader.result as string;
 
-    audioRef.current.onended = () => {
-      console.log('✅ Ses tamamlandı');
-      setIsSpeaking(false);
-      setAudioLevel(0);
-      URL.revokeObjectURL(audioUrl);
+      if (!audioRef.current) audioRef.current = new Audio();
+      audioRef.current.src = base64Audio; // Base64 data URL
+
+      audioRef.current.onended = () => {
+        console.log('✅ Ses tamamlandı');
+        setIsSpeaking(false);
+        setAudioLevel(0);
+      };
+
+      audioRef.current.onerror = (e) => {
+        console.error('❌ Ses Oynatma Hatası:', e);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+      };
+
+      audioRef.current.play().catch(err => {
+        console.error('❌ Play hatası:', err);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+      });
+
+      console.log('▶️ Ses oynatılıyor...');
     };
 
-    audioRef.current.onerror = (e) => {
-      console.error('❌ Ses Oynatma Hatası:', e);
-      setIsSpeaking(false);
-      setAudioLevel(0);
-    };
+    reader.readAsDataURL(audioBlob);
 
-    await audioRef.current.play();
-    console.log('▶️ Ses oynatılıyor...');
   } catch (error) {
     console.error('❌ Konuşma Hatası:', error);
     setIsSpeaking(false);
@@ -322,6 +328,7 @@ const speak = async (text: string): Promise<void> => {
     throw error;
   }
 };
+
 
 
   const stopSpeaking = () => {
