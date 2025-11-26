@@ -58,25 +58,48 @@ useEffect(() => {
 }, []);
 
 
-  const setupSpeechRecognition = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.lang = 'tr-TR';
-    recognitionRef.current.continuous = true;
-    recognitionRef.current.interimResults = false;
-    recognitionRef.current.onresult = (event: any) => {
-      const text = event.results[event.results.length - 1][0].transcript;
-      setTranscript(text);
-      handleUserSpeech(text);
-    };
-    recognitionRef.current.onerror = (event: any) => {
-      if (event.error === 'no-speech') setTimeout(() => { if (isListening && !isProcessing) startListening(); }, 1000);
-    };
-    recognitionRef.current.onend = () => {
-      if (isListening && !isProcessing) setTimeout(() => startListening(), 300);
-    };
+const setupSpeechRecognition = () => {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    console.error('❌ Speech Recognition desteklenmiyor');
+    return;
+  }
+
+  recognitionRef.current = new SpeechRecognition();
+  recognitionRef.current.lang = 'tr-TR';
+  recognitionRef.current.continuous = true;
+  recognitionRef.current.interimResults = false;
+
+  recognitionRef.current.onstart = () => {
+    console.log('🎤 Mikrofon başladı');
   };
+
+  recognitionRef.current.onresult = (event: any) => {
+    const text = event.results[event.results.length - 1][0].transcript;
+    console.log('📝 Transkript:', text);
+    setTranscript(text);
+    handleUserSpeech(text);
+  };
+
+  recognitionRef.current.onerror = (event: any) => {
+    console.error('❌ Ses Tanıma Hatası:', event.error);
+    if (event.error === 'no-speech') {
+      console.log('⚠️ Ses algılanmadı, tekrar deneniyor...');
+      setTimeout(() => {
+        if (isListening && !isProcessing) startListening();
+      }, 1000);
+    }
+  };
+
+  recognitionRef.current.onend = () => {
+    console.log('🛑 Mikrofon kapandı');
+    if (isListening && !isProcessing) {
+      setTimeout(() => startListening(), 300);
+    }
+  };
+};
+
 
   const startAudioVisualization = () => {
     let phase = 0;
