@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Mic, Volume2, VolumeX, Radio, Zap, Activity, Cpu } from 'lucide-react';
 import ilkyarLogo from './assets/ilkyar_logo.png';
 import './App.css';
+
 const App = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -13,13 +14,16 @@ const App = () => {
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
   const [bootProgress, setBootProgress] = useState(0);
+  const [error, setError] = useState('');
 
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+  const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+  const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
   const SYSTEM_PROMPT = `Sen Balkız, profesyonel bir Türkçe kadın asistansın. Kısa, öz ve net yanıtlar ver (maksimum 2-3 cümle). Profesyonel ve yardımcı ol.`;
 
@@ -31,80 +35,53 @@ const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
     { id: 'pNInz6obpgDQGcFmaJgB', name: '5' }
   ];
 
-useEffect(() => {
-  const savedVoice = localStorage.getItem('balkiz_voice');
-  if (savedVoice) setSelectedVoice(savedVoice);
+  // Boot Screen Effect
+  useEffect(() => {
+    const savedVoice = localStorage.getItem('balkiz_voice');
+    if (savedVoice) setSelectedVoice(savedVoice);
 
-  let progress = 0;
-  const bootInterval = setInterval(() => {
-    progress += 1;
-    setBootProgress(progress);
-    if (progress >= 100) {
+    let progress = 0;
+    const bootInterval = setInterval(() => {
+      progress += 1;
+      setBootProgress(progress);
+      if (progress >= 100) {
+        clearInterval(bootInterval);
+        setTimeout(() => {
+          setShowBootScreen(false);
+          initializeAudio();
+        }, 500);
+      }
+    }, 50);
+
+    return () => {
       clearInterval(bootInterval);
-      setTimeout(() => {
-        setShowBootScreen(false);
-        setupSpeechRecognition();
-        // Sessiz başla - ses yok
-      }, 500);
-    }
-  }, 50);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (audioRef.current) audioRef.current.pause();
+    };
+  }, []);
 
-  return () => {
-    clearInterval(bootInterval);
-    if (recognitionRef.current) recognitionRef.current.stop();
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (audioRef.current) audioRef.current.pause();
-  };
-}, []);
-
-
-const setupSpeechRecognition = () => {
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    console.error('❌ Speech Recognition desteklenmiyor');
-    return;
-  }
-
-  recognitionRef.current = new SpeechRecognition();
-  recognitionRef.current.lang = 'tr-TR';
-  recognitionRef.current.continuous = true;
-  recognitionRef.current.interimResults = false;
-
-  recognitionRef.current.onstart = () => {
-    console.log('🎤 Mikrofon başladı');
-  };
-
-  recognitionRef.current.onresult = (event: any) => {
-    const text = event.results[event.results.length - 1][0].transcript;
-    console.log('📝 Transkript:', text);
-    setTranscript(text);
-    handleUserSpeech(text);
-  };
-
-  recognitionRef.current.onerror = (event: any) => {
-    console.error('❌ Ses Tanıma Hatası:', event.error);
-    if (event.error === 'no-speech') {
-      console.log('⚠️ Ses algılanmadı, tekrar deneniyor...');
-      setTimeout(() => {
-        if (isListening && !isProcessing) startListening();
-      }, 1000);
+  // Mikrofon başlat
+  const initializeAudio = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      console.log('✅ Mikrofon başlatıldı');
+    } catch (error) {
+      console.error('❌ Mikrofon erişimi başarısız:', error);
+      setError('Mikrofon erişimi reddedildi');
     }
   };
-
-  recognitionRef.current.onend = () => {
-    console.log('🛑 Mikrofon kapandı');
-    if (isListening && !isProcessing) {
-      setTimeout(() => startListening(), 300);
-    }
-  };
-};
-
 
   const startAudioVisualization = () => {
     let phase = 0;
     const animate = () => {
-      if (!isSpeaking && !isListening) { setAudioLevel(0); return; }
+      if (!isSpeaking && !isListening) {
+        setAudioLevel(0);
+        return;
+      }
       phase += 0.08;
       const level = 0.3 + Math.sin(phase) * 0.25 + Math.sin(phase * 1.5) * 0.15 + Math.random() * 0.3;
       setAudioLevel(Math.min(Math.max(level, 0), 1));
@@ -113,26 +90,87 @@ const setupSpeechRecognition = () => {
     animate();
   };
 
-  const startListening = () => {
-    if (!recognitionRef.current || isProcessing) return;
-    try { recognitionRef.current.start(); setIsListening(true); startAudioVisualization(); }
-    catch (error: any) { if (!error.message.includes('already started')) console.error(error); }
-  };
+  const startListening = async () => {
+    if (!streamRef.current || isProcessing) return;
 
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (error) {}
-      setIsListening(false);
-      setAudioLevel(0);
+    try {
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(streamRef.current);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsListening(true);
+      startAudioVisualization();
+      console.log('🎤 Dinleme başladı');
+    } catch (error) {
+      console.error('❌ Dinleme başlatma hatası:', error);
+      setError('Dinleme başlatılamadı');
     }
   };
 
-  const toggleListening = () => isListening ? stopListening() : startListening();
+  const stopListening = () => {
+    if (mediaRecorderRef.current && isListening) {
+      mediaRecorderRef.current.stop();
+      setIsListening(false);
+      setAudioLevel(0);
+      console.log('🛑 Dinleme durduruldu');
+    }
+  };
+
+  const toggleListening = () => (isListening ? stopListening() : startListening());
+
+  // Groq Whisper API ile transkripsiyon
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsProcessing(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'audio.webm');
+      formData.append('model', 'whisper-large-v3-turbo');
+      formData.append('language', 'tr');
+
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Transkripsiyon Hatası:', response.status, errorText);
+        throw new Error(`Transcription error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.text;
+      console.log('📝 Transkript:', text);
+      setTranscript(text);
+      await handleUserSpeech(text);
+    } catch (error) {
+      console.error('❌ Transkripsiyon başarısız:', error);
+      setError('Ses tanıma başarısız oldu');
+      setIsProcessing(false);
+      setTimeout(() => startListening(), 1000);
+    }
+  };
 
   const handleUserSpeech = async (text: string) => {
-    if (!text.trim() || isProcessing) return;
-    setIsProcessing(true);
-    stopListening();
+    if (!text.trim()) {
+      setIsProcessing(false);
+      setTimeout(() => startListening(), 1000);
+      return;
+    }
+
     try {
       const aiResponse = await getAIResponse(text);
       setResponse(aiResponse);
@@ -149,79 +187,98 @@ const setupSpeechRecognition = () => {
   };
 
   const getAIResponse = async (userMessage: string): Promise<string> => {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.1-70b-versatile',
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMessage }],
-        max_tokens: 200,
-        temperature: 0.7,
-      }),
-    });
-    if (!response.ok) throw new Error('AI error');
-    const data = await response.json();
-    return data.choices[0].message.content;
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-70b-versatile',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userMessage }
+          ],
+          max_tokens: 200,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Groq API Hatası:', response.status, errorText);
+        throw new Error(`AI error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('❌ AI Yanıt Hatası:', error);
+      throw error;
+    }
   };
 
-const speak = async (text: string): Promise<void> => {
-  setIsSpeaking(true);
-  startAudioVisualization();
-  try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.8,
-          style: 0.4,
-          use_speaker_boost: true
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ElevenLabs API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-        voiceId: selectedVoice
+  const speak = async (text: string): Promise<void> => {
+    setIsSpeaking(true);
+    startAudioVisualization();
+    try {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.8,
+            style: 0.4,
+            use_speaker_boost: true
+          }
+        })
       });
-      throw new Error(`Audio error: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ ElevenLabs API Hatası:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          voiceId: selectedVoice
+        });
+        throw new Error(`Audio error: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      if (!audioRef.current) audioRef.current = new Audio();
+      audioRef.current.src = audioUrl;
+
+      audioRef.current.onended = () => {
+        setIsSpeaking(false);
+        setAudioLevel(0);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audioRef.current.onerror = (e) => {
+        console.error('❌ Ses Oynatma Hatası:', e);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+      };
+
+      await audioRef.current.play();
+    } catch (error) {
+      console.error('❌ Konuşma Hatası:', error);
+      setIsSpeaking(false);
+      setAudioLevel(0);
+      throw error;
     }
-
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-
-    if (!audioRef.current) audioRef.current = new Audio();
-    audioRef.current.src = audioUrl;
-    audioRef.current.onended = () => {
-      setIsSpeaking(false);
-      setAudioLevel(0);
-      URL.revokeObjectURL(audioUrl);
-    };
-    audioRef.current.onerror = (e) => {
-      console.error('Audio playback error:', e);
-      setIsSpeaking(false);
-      setAudioLevel(0);
-    };
-    await audioRef.current.play();
-  } catch (error) {
-    console.error('speak error:', error);
-    setIsSpeaking(false);
-    setAudioLevel(0);
-    throw error;
-  }
-};
-
+  };
 
   const stopSpeaking = () => {
     if (audioRef.current) {
@@ -303,26 +360,26 @@ const speak = async (text: string): Promise<void> => {
       <svg className="particle-animation" viewBox="0 0 400 400">
         <defs>
           <filter id="glow">
-            <feGaussianBlur stdDeviation="4" result="blur"/>
-            <feFlood floodColor="#00ffff" floodOpacity="0.8"/>
-            <feComposite in2="blur" operator="in"/>
-            <feComposite in="SourceGraphic"/>
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feFlood floodColor="#00ffff" floodOpacity="0.8" />
+            <feComposite in2="blur" operator="in" />
+            <feComposite in="SourceGraphic" />
           </filter>
         </defs>
 
         <circle cx="200" cy="200" r="15" fill="none" stroke="#00ffff" strokeWidth="2" opacity="0.8">
-          <animate attributeName="r" values="15;20;15" dur="2s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="r" values="15;20;15" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
         </circle>
 
         <circle cx="200" cy="200" r="60" fill="none" stroke="#00ffff" strokeWidth="1" opacity="0.3">
-          <animate attributeName="opacity" values="0.2;0.5;0.2" dur="3s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.2;0.5;0.2" dur="3s" repeatCount="indefinite" />
         </circle>
         <circle cx="200" cy="200" r="85" fill="none" stroke="#00ffff" strokeWidth="1" opacity="0.3">
-          <animate attributeName="opacity" values="0.2;0.5;0.2" dur="4s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.2;0.5;0.2" dur="4s" repeatCount="indefinite" />
         </circle>
         <circle cx="200" cy="200" r="110" fill="none" stroke="#00ffff" strokeWidth="1" opacity="0.3">
-          <animate attributeName="opacity" values="0.2;0.5;0.2" dur="5s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.2;0.5;0.2" dur="5s" repeatCount="indefinite" />
         </circle>
 
         <g filter="url(#glow)">
@@ -367,10 +424,18 @@ const speak = async (text: string): Promise<void> => {
         </div>
         <p className="boot-status">HAZIRLANIYOR... {bootProgress}%</p>
         <div className="boot-modules">
-          <div className={`boot-module ${bootProgress > 20 ? 'active' : ''}`}><Cpu size={16} /> Neüron Sentezi</div>
-          <div className={`boot-module ${bootProgress > 40 ? 'active' : ''}`}><Activity size={16} /> Ses Tanıma</div>
-          <div className={`boot-module ${bootProgress > 60 ? 'active' : ''}`}><Zap size={16} /> Yapay Zeka Çekirdeği</div>
-          <div className={`boot-module ${bootProgress > 80 ? 'active' : ''}`}><Radio size={16} /> İletişim</div>
+          <div className={`boot-module ${bootProgress > 20 ? 'active' : ''}`}>
+            <Cpu size={16} /> Neüron Sentezi
+          </div>
+          <div className={`boot-module ${bootProgress > 40 ? 'active' : ''}`}>
+            <Activity size={16} /> Ses Tanıma
+          </div>
+          <div className={`boot-module ${bootProgress > 60 ? 'active' : ''}`}>
+            <Zap size={16} /> Yapay Zeka Çekirdeği
+          </div>
+          <div className={`boot-module ${bootProgress > 80 ? 'active' : ''}`}>
+            <Radio size={16} /> İletişim
+          </div>
         </div>
       </div>
     );
@@ -384,10 +449,13 @@ const speak = async (text: string): Promise<void> => {
       <header className="header">
         <div className="logo-section">
           <Radio size={24} />
-          <div><h1>B.A.L.K.I.Z</h1><span className="subtitle">BİONİK YAPAY ZEKA vEarly.1</span></div>
-        <div className="logo-placeholder">
-          <img src={ilkyarLogo} alt="Logo" />
-        </div>
+          <div>
+            <h1>B.A.L.K.I.Z</h1>
+            <span className="subtitle">BİONİK YAPAY ZEKA vEarly.1</span>
+          </div>
+          <div className="logo-placeholder">
+            <img src={ilkyarLogo} alt="Logo" />
+          </div>
         </div>
 
         <button className="voice-btn" onClick={() => setShowVoiceMenu(!showVoiceMenu)}>
@@ -397,9 +465,15 @@ const speak = async (text: string): Promise<void> => {
 
       {showVoiceMenu && (
         <div className="voice-menu">
-          <div className="voice-menu-header"><Zap size={16} /> SES SEÇ</div>
+          <div className="voice-menu-header">
+            <Zap size={16} /> SES SEÇ
+          </div>
           {VOICE_OPTIONS.map(voice => (
-            <button key={voice.id} className={`voice-option ${selectedVoice === voice.id ? 'active' : ''}`} onClick={() => changeVoice(voice.id)}>
+            <button
+              key={voice.id}
+              className={`voice-option ${selectedVoice === voice.id ? 'active' : ''}`}
+              onClick={() => changeVoice(voice.id)}
+            >
               {voice.name} {selectedVoice === voice.id && '✓'}
             </button>
           ))}
@@ -410,58 +484,137 @@ const speak = async (text: string): Promise<void> => {
         <div className="interface-container">
           <div className="side-panel left-panel">
             <div className="panel-section">
-              <div className="panel-header"><Activity size={16} /> SİSTEM ANALİZİ</div>
-              <div className="status-item"><span>Neural Network</span><span className="online">ONLINE</span></div>
-              <div className="status-item"><span>Voice Module</span><span className="online">AKTİF</span></div>
-              <div className="status-item"><span>AI Core</span><span className="online">HAZIR</span></div>
+              <div className="panel-header">
+                <Activity size={16} /> SİSTEM ANALİZİ
+              </div>
+              <div className="status-item">
+                <span>Neural Network</span>
+                <span className="online">ONLINE</span>
+              </div>
+              <div className="status-item">
+                <span>Voice Module</span>
+                <span className="online">AKTİF</span>
+              </div>
+              <div className="status-item">
+                <span>AI Core</span>
+                <span className="online">HAZIR</span>
+              </div>
             </div>
             <div className="panel-section">
-              <div className="panel-header"><Cpu size={16} /> SİSTEM KONTROL</div>
-              <div className="diagnostic-bar"><div className="diagnostic-label">İŞLEMCİ</div><div className="diagnostic-progress" style={{ width: '75%' }} /></div>
-              <div className="diagnostic-bar"><div className="diagnostic-label">BELLEK</div><div className="diagnostic-progress" style={{ width: '60%' }} /></div>
-              <div className="diagnostic-bar"><div className="diagnostic-label">AĞ</div><div className="diagnostic-progress" style={{ width: '90%' }} /></div>
+              <div className="panel-header">
+                <Cpu size={16} /> SİSTEM KONTROL
+              </div>
+              <div className="diagnostic-bar">
+                <div className="diagnostic-label">İŞLEMCİ</div>
+                <div className="diagnostic-progress" style={{ width: '75%' }} />
+              </div>
+              <div className="diagnostic-bar">
+                <div className="diagnostic-label">BELLEK</div>
+                <div className="diagnostic-progress" style={{ width: '60%' }} />
+              </div>
+              <div className="diagnostic-bar">
+                <div className="diagnostic-label">AĞ</div>
+                <div className="diagnostic-progress" style={{ width: '90%' }} />
+              </div>
             </div>
           </div>
 
           <div className="visualizer-section">
-            <button className={`core-btn ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''}`} onClick={toggleListening} disabled={isProcessing}>
+            <button
+              className={`core-btn ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''}`}
+              onClick={toggleListening}
+              disabled={isProcessing}
+            >
               <div className="core-ring" />
-              <div className="core-inner">{isSpeaking ? <Volume2 size={40} /> : <Mic size={40} />}</div>
+              <div className="core-inner">
+                {isSpeaking ? <Volume2 size={40} /> : <Mic size={40} />}
+              </div>
             </button>
 
-            {isSpeaking && <button className="stop-btn" onClick={stopSpeaking}><VolumeX size={18} /> BEKLE</button>}
+            {isSpeaking && (
+              <button className="stop-btn" onClick={stopSpeaking}>
+                <VolumeX size={18} /> BEKLE
+              </button>
+            )}
 
             <div className="waveform">
               {Array.from({ length: 60 }).map((_, i) => {
-                const h = (isListening || isSpeaking) ? Math.sin((i / 60) * Math.PI * 6 + audioLevel * 10) * audioLevel * 80 + 4 : 4;
-                return <div key={i} className="wave-bar" style={{ height: `${h}px`, opacity: 0.3 + (isListening || isSpeaking ? audioLevel * 0.7 : 0) }} />;
+                const h = isListening || isSpeaking
+                  ? Math.sin((i / 60) * Math.PI * 6 + audioLevel * 10) * audioLevel * 80 + 4
+                  : 4;
+                return (
+                  <div
+                    key={i}
+                    className="wave-bar"
+                    style={{
+                      height: `${h}px`,
+                      opacity: 0.3 + (isListening || isSpeaking ? audioLevel * 0.7 : 0)
+                    }}
+                  />
+                );
               })}
             </div>
 
             <div className="status">
-              <div className={`status-dot ${isListening ? 'active' : ''} ${isSpeaking ? 'speaking' : ''}`} />
-              <span>{isProcessing ? 'PROCESSING' : isListening ? 'LISTENING' : isSpeaking ? 'SPEAKING' : 'STANDBY'}</span>
+              <div
+                className={`status-dot ${isListening ? 'active' : ''} ${isSpeaking ? 'speaking' : ''}`}
+              />
+              <span>
+                {isProcessing ? 'PROCESSING' : isListening ? 'LISTENING' : isSpeaking ? 'SPEAKING' : 'STANDBY'}
+              </span>
             </div>
           </div>
 
           <div className="side-panel right-panel">
             <div className="panel-section">
-              <div className="panel-header"><Zap size={16} /> ACTIVITY LOG</div>
-              <div className="log-entry"><span className="log-time">{new Date().toLocaleTimeString()}</span><span>System initialized</span></div>
-              {transcript && <div className="log-entry active"><span className="log-time">{new Date().toLocaleTimeString()}</span><span>User input detected</span></div>}
-              {response && <div className="log-entry response"><span className="log-time">{new Date().toLocaleTimeString()}</span><span>Response generated</span></div>}
+              <div className="panel-header">
+                <Zap size={16} /> ACTIVITY LOG
+              </div>
+              <div className="log-entry">
+                <span className="log-time">{new Date().toLocaleTimeString()}</span>
+                <span>System initialized</span>
+              </div>
+              {error && (
+                <div className="log-entry" style={{ color: '#ff4444' }}>
+                  <span className="log-time">{new Date().toLocaleTimeString()}</span>
+                  <span>⚠️ {error}</span>
+                </div>
+              )}
+              {transcript && (
+                <div className="log-entry active">
+                  <span className="log-time">{new Date().toLocaleTimeString()}</span>
+                  <span>User input detected</span>
+                </div>
+              )}
+              {response && (
+                <div className="log-entry response">
+                  <span className="log-time">{new Date().toLocaleTimeString()}</span>
+                  <span>Response generated</span>
+                </div>
+              )}
             </div>
             <div className="panel-section">
-              <div className="panel-header"><Radio size={16} /> AUDIO LEVELS</div>
-              <div className="audio-meter"><div className="audio-meter-bar" style={{ height: `${audioLevel * 100}%` }} /></div>
+              <div className="panel-header">
+                <Radio size={16} /> AUDIO LEVELS
+              </div>
+              <div className="audio-meter">
+                <div className="audio-meter-bar" style={{ height: `${audioLevel * 100}%` }} />
+              </div>
             </div>
           </div>
         </div>
 
-        {transcript && <div className="msg"><strong>SEN:</strong> {transcript}</div>}
-        {response && <div className="msg ai"><strong>B.A.L.K.I.Z:</strong> {response}</div>}
+        {transcript && (
+          <div className="msg">
+            <strong>SEN:</strong> {transcript}
+          </div>
+        )}
+        {response && (
+          <div className="msg ai">
+            <strong>B.A.L.K.I.Z:</strong> {response}
+          </div>
+        )}
       </main>
-
     </div>
   );
 };
