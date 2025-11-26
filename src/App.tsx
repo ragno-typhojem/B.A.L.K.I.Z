@@ -37,6 +37,10 @@ const App = () => {
 
   // Boot Screen Effect
   useEffect(() => {
+      console.log('=== DEBUG: ENV VARIABLES ===');
+  console.log('VITE_GROQ_API_KEY:', import.meta.env.VITE_GROQ_API_KEY);
+  console.log('VITE_ELEVENLABS_API_KEY:', import.meta.env.VITE_ELEVENLABS_API_KEY);
+  console.log('All env:', import.meta.env);
     const savedVoice = localStorage.getItem('balkiz_voice');
     if (savedVoice) setSelectedVoice(savedVoice);
 
