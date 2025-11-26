@@ -21,7 +21,7 @@ const App = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // ✅ Kayıt süresi için
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // ✅ Kayıt süresi için
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
