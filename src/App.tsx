@@ -217,7 +217,7 @@ const getAIResponse = async (userMessage: string): Promise<string> => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-70b-versatile',
+        model: 'llama-3.3-70b-versatile', // ✅ YENİ MODEL
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userMessage }
@@ -237,11 +237,6 @@ const getAIResponse = async (userMessage: string): Promise<string> => {
         error: errorData
       });
 
-      // Content policy hatası kontrolü
-      if (errorData.error?.message?.includes('content_policy')) {
-        throw new Error('İçerik politikası ihlali - farklı bir şey dene');
-      }
-
       throw new Error(`AI error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
@@ -253,6 +248,7 @@ const getAIResponse = async (userMessage: string): Promise<string> => {
     throw error;
   }
 };
+
 
 const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
