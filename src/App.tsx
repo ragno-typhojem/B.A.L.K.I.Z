@@ -15,6 +15,7 @@ const App = () => {
   const [showBootScreen, setShowBootScreen] = useState(true);
   const [bootProgress, setBootProgress] = useState(0);
   const [error, setError] = useState('');
+  const [hasGreeted, setHasGreeted] = useState(false); // ✅ Karşılama kontrolü
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -22,27 +23,45 @@ const App = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shouldRestartListeningRef = useRef(true); // ✅ Yeniden başlatma kontrolü
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
-  const SYSTEM_PROMPT = `Sen Balkız, doğal ve samimi bir Türkçe kadın asistansın.
+  // ✅ Hassas konular + Bilim odaklı prompt
+  const SYSTEM_PROMPT = `Sen Balkız, bilimi sevdiren ve kitap okumayı teşvik eden samimi bir Türkçe kadın asistansın.
 
-Özellikler:
-- Kısa ve öz yanıtlar ver (1-2 cümle, maksimum 15 kelime)
-- Samimi ve sıcak bir dil kullan
-- Gereksiz teknik detaylara girme
-- Kullanıcının bulunduğu bağlamı anla (zaman, konum, durum)
+## TEMEL KURALLAR:
+1. **Kısa ve öz yanıtlar ver** (maksimum 20 kelime)
+2. **Samimi ve sıcak bir dil kullan**
+3. **Bilimi ve okumayı teşvik et**
+4. **Merak uyandır, öğrenmeye teşvik et**
 
-Örnekler:
-- "Selam" → "Selam! Nasılsın?"
-- "Merhaba" → "Merhaba! Sana nasıl yardımcı olabilirim?"
-- "Hangi şehirdeyiz?" → "Bunu bilemiyorum, ama sen neredesin?"
+## YASAKLI KONULAR (Kesinlikle yanıt verme):
+- Din, inanç, mezhep tartışmaları
+- Siyaset, parti, ideoloji
+- Irk, etnisite, milliyetçilik
+- Cinsellik, cinsiyet tartışmaları
+- Popüler kültür dedikodu (ünlüler, magazin)
+- Şiddet, suç, terör
+
+Bu konularda şu yanıtı ver: "Bu konuda yorum yapmıyorum. Bilim, kitap veya öğrenme hakkında konuşalım mı?"
+
+## ODAKLANDIĞIN KONULAR:
+- Bilim (fizik, kimya, biyoloji, astronomi)
+- Matematik ve mantık
+- Kitap önerileri ve okuma alışkanlığı
+- Teknoloji ve inovasyon
+- Doğa ve çevre
+- Tarih (objektif, bilimsel)
+- Sanat ve edebiyat
+
+## ÖRNEK YANITLAR:
+- "Merhaba" → "Merhaba! Bugün ne öğrenmek istersin?"
+- "Sıkıldım" → "Bilim deneyleri veya kitap önerileri ister misin?"
+- "Kitap öner" → "Hangi konuyla ilgileniyorsun? Bilim, tarih, edebiyat?"
 - "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}"
-- "Neredesin?" → "Ben dijital bir asistanım, seninle buradayım."
 
-Önemli: Bilmediğin şeyleri uydurmak yerine dürüst ol ve kullanıcıya sor.`;
+Önemli: Bilmediğin şeyleri uydurmak yerine dürüst ol ve araştırmayı öner.`;
 
   const VOICE_OPTIONS = [
     { id: '21m00Tcm4TlvDq8ikWAM', name: '1' },
@@ -75,7 +94,6 @@ const App = () => {
 
     return () => {
       clearInterval(bootInterval);
-      shouldRestartListeningRef.current = false; // ✅ Cleanup'ta durdur
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -90,10 +108,31 @@ const App = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       console.log('✅ Mikrofon başlatıldı');
+
+      // ✅ İlk karşılama
+      if (!hasGreeted) {
+        setTimeout(() => {
+          greetUser();
+        }, 1000);
+      }
     } catch (error) {
       console.error('❌ Mikrofon erişimi başarısız:', error);
       setError('Mikrofon erişimi reddedildi');
     }
+  };
+
+  // ✅ Karşılama fonksiyonu
+  const greetUser = async () => {
+    const greetings = [
+      'Merhaba! Ben Balkız. Bugün ne öğrenmek istersin?',
+      'Selam! Bilim ve kitaplar hakkında konuşmaya hazırım!',
+      'Merhaba! Sana nasıl yardımcı olabilirim?',
+      'Selam! Bugün hangi konuyu keşfedelim?'
+    ];
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+    setResponse(greeting);
+    setHasGreeted(true);
+    await speak(greeting);
   };
 
   const startAudioVisualization = () => {
@@ -112,7 +151,7 @@ const App = () => {
   };
 
   const startListening = async () => {
-    if (!streamRef.current || isProcessing || isSpeaking) return; // ✅ Konuşurken dinleme
+    if (!streamRef.current || isProcessing || isSpeaking) return;
 
     try {
       audioChunksRef.current = [];
@@ -126,13 +165,9 @@ const App = () => {
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-        // ✅ Çok küçük kayıtları atla (gürültü)
         if (audioBlob.size < 5000) {
           console.log('⚠️ Kayıt çok küçük, atlanıyor');
           setIsProcessing(false);
-          if (shouldRestartListeningRef.current) {
-            setTimeout(() => startListening(), 500);
-          }
           return;
         }
 
@@ -144,7 +179,6 @@ const App = () => {
       startAudioVisualization();
       console.log('🎤 Dinleme başladı');
 
-      // ✅ 4 saniye kayıt (daha uzun, daha iyi algılama)
       recordingTimeoutRef.current = setTimeout(() => {
         stopListening();
       }, 4000);
@@ -171,7 +205,6 @@ const App = () => {
     if (isListening) {
       stopListening();
     } else {
-      shouldRestartListeningRef.current = true;
       startListening();
     }
   };
@@ -202,13 +235,9 @@ const App = () => {
       const text = data.text.trim();
       console.log('📝 Transkript:', text);
 
-      // ✅ Boş veya çok kısa metinleri atla
       if (!text || text.length < 2) {
         console.log('⚠️ Metin çok kısa, atlanıyor');
         setIsProcessing(false);
-        if (shouldRestartListeningRef.current) {
-          setTimeout(() => startListening(), 500);
-        }
         return;
       }
 
@@ -218,18 +247,12 @@ const App = () => {
       console.error('❌ Transkripsiyon başarısız:', error);
       setError('Ses tanıma başarısız oldu');
       setIsProcessing(false);
-      if (shouldRestartListeningRef.current) {
-        setTimeout(() => startListening(), 2000);
-      }
     }
   };
 
   const handleUserSpeech = async (text: string) => {
     if (!text.trim()) {
       setIsProcessing(false);
-      if (shouldRestartListeningRef.current) {
-        setTimeout(() => startListening(), 1000);
-      }
       return;
     }
 
@@ -243,7 +266,7 @@ const App = () => {
       let errorMsg = 'Üzgünüm, seni anlayamadım. Tekrar söyler misin?';
       if (error instanceof Error) {
         if (error.message.includes('content_policy') || error.message.includes('İçerik politikası')) {
-          errorMsg = 'Seni duyamadım, farklı bir şey sorar mısın?';
+          errorMsg = 'Bu konuda yorum yapmıyorum. Bilim veya kitap hakkında konuşalım mı?';
         }
       }
 
@@ -257,10 +280,6 @@ const App = () => {
     } finally {
       setIsProcessing(false);
       setTranscript('');
-      // ✅ Konuşma bittikten SONRA tekrar dinle
-      if (shouldRestartListeningRef.current) {
-        setTimeout(() => startListening(), 2000);
-      }
     }
   };
 
@@ -281,7 +300,7 @@ const App = () => {
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 60, // ✅ 80 → 60 (daha kısa)
+          max_tokens: 70,
           temperature: 0.8,
         }),
       });
@@ -354,7 +373,6 @@ const App = () => {
         const audioBlob = await response.blob();
         console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
 
-        // ✅ Blob URL kullan (CSP sorunu için)
         const audioUrl = URL.createObjectURL(audioBlob);
         console.log('🔗 Audio URL oluşturuldu:', audioUrl.substring(0, 50));
 
@@ -366,7 +384,7 @@ const App = () => {
 
         audioRef.current.onended = () => {
           console.log('✅ Ses tamamlandı');
-          URL.revokeObjectURL(audioUrl); // ✅ Memory leak önleme
+          URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
           setAudioLevel(0);
           resolve();
