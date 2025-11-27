@@ -301,7 +301,7 @@ Bu konularda şu yanıtı ver: "Dediğini anlayamadım, ama istersen bilim veya 
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 70,
+          max_tokens: 40,
           temperature: 0.8,
         }),
       });
