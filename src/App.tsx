@@ -44,7 +44,7 @@ const App = () => {
 - Popüler kültür dedikodu (ünlüler, magazin)
 - Şiddet, suç, terör
 
-Bu konularda şu yanıtı ver: "Bu konuda yorum yapmıyorum. Bilim, kitap veya öğrenme hakkında konuşalım mı?"
+Bu konularda şu yanıtı ver: "Dediğini anlayamadım, ama istersen bilim veya kitaplar hakkında konuşabiliriz."
 
 ## ODAKLANDIĞIN KONULAR:
 - Bilim (fizik, kimya, biyoloji, astronomi)
@@ -61,7 +61,7 @@ Bu konularda şu yanıtı ver: "Bu konuda yorum yapmıyorum. Bilim, kitap veya �
 - "Kitap öner" → "Hangi konuyla ilgileniyorsun? Bilim, tarih, edebiyat?"
 - "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}"
 
-Önemli: Bilmediğin şeyleri uydurmak yerine dürüst ol ve araştırmayı öner.`;
+Önemli: Bilmediğin şeyleri uydurmak yerine dürüst ol ve araştırmayı öner. Sana mektup yazmalarını öner.`;
 
   const VOICE_OPTIONS = [
     { id: '21m00Tcm4TlvDq8ikWAM', name: '1' },
