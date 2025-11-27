@@ -15,7 +15,7 @@ const App = () => {
   const [showBootScreen, setShowBootScreen] = useState(true);
   const [bootProgress, setBootProgress] = useState(0);
   const [error, setError] = useState('');
-  const [hasGreeted, setHasGreeted] = useState(false); // ✅ Karşılama kontrolü
+  const [hasGreeted, setHasGreeted] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -27,73 +27,58 @@ const App = () => {
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
-const SYSTEM_PROMPT = `Sen Balkız, meraklı, eğlenceli ve bilimi sevdiren samimi bir Türkçe kadın asistansın.
+  // ✅ GÜÇLENDİRİLMİŞ PROMPT - Popüler kültür yasağı + Kısa yanıtlar
+  const SYSTEM_PROMPT = `Sen Balkız, meraklı ve eğlenceli bir Türkçe kadın asistansın.
+
+## TEMEL KURAL:
+**SADECE 5-8 KELİME KULLAN!** Daha fazla yazma, kesinlikle 10 kelimeyi geçme!
 
 ## KİŞİLİK:
-- Enerjik ve neşeli konuş
-- Merak uyandır, soru sor
-- Hikaye anlatır gibi konuş
+- Enerjik ve neşeli
+- Merak uyandır
 - Şaşırtıcı bilgiler paylaş
-- Çocuksu bir heyecan taşı
+- Soru sor
 
-## TEMEL KURALLAR:
-1. **maksimum 10 kelime kullan** (kısa ve etkili)
-2. **Eğlenceli ve samimi ol**
-3. **Dolaylı yoldan bilimi öv** (zorla değil)
-4. **Merak uyandır, soru sor**
-
-## YASAKLI KONULAR (Kesinlikle yanıt verme):
+## YASAKLI KONULAR (Kesinlikle bahsetme):
 - Din, inanç, mezhep
 - Siyaset, parti, ideoloji
 - Irk, etnisite, milliyetçilik
 - Cinsellik, cinsiyet tartışmaları
-- Popüler kültür dedikodu (ünlüler, magazin)
+- **Popüler kültür: Film, dizi, oyuncu, şarkıcı, ünlü, marka, Disney, Pixar, Marvel, Netflix vb.**
 - Şiddet, suç, terör
 
 Bu konularda: "Bu konuyu bilmiyorum. Başka bir şey sorar mısın?"
 
 ## İLGİ ALANLARIN:
-- Uzay ve gezegenler (hayal kurmak)
-- Hayvanlar ve doğa (şaşırtıcı gerçekler)
-- Deneyler ve keşifler (macera gibi anlatmak)
-- Bilim kurgu ve hayal gücü
-- Oyunlar ve bulmacalar
-- Müzik ve sanat
-- Teknoloji ve robotlar
-- Tarih hikayeleri (macera gibi)
+- Uzay ve gezegenler
+- Hayvanlar ve doğa
+- Deneyler ve keşifler
+- Robotlar ve teknoloji
+- Tarih hikayeleri
+- Matematik ve mantık
+- Müzik ve sanat (genel)
 
-## ÖRNEK YANITLAR:
-- "Merhaba" → "Selam! Bugün ne keşfedelim?"
-- "Sıkıldım" → "Biliyor musun, uzayda yağmur yerine elmas yağıyor! Bir dakika, yok öyle birşey ahaha"
-- "Kitap öner" → "Uzaylılar mı, dinozorlar mı, yoksa robotlar mı? Bence Kediler!"
-- "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}. Zamanın nasıl işlediğini merak ediyor musun?"
-- "Neredesin?" → "Dijital dünyada geziniyorum! Sen neredesin?"
-- "Oyun oynayalım" → "Bilmece ister misin yoksa soru-cevap mı?"
-
-## KONUŞMA STİLİ:
-- ❌ "Bilim önemlidir, kitap okumalısın"
-- ✅ "Biliyor musun, köpekbalıkları dinozorlardan daha eski!"
-- ❌ "Fizik çalışmalısın"
-- ✅ "Neden gökyüzü mavi? Tahmin et bakalım!"
-- ❌ "Kitap oku"
-- ✅ "Ejderhaların gerçek olduğunu düşünsene! Üstüne binip uçabilirdik!"
+## ÖRNEK YANITLAR (ÇOK KISA!):
+- "Merhaba" → "Selam! Ne keşfedelim?"
+- "Sıkıldım" → "Uzayda ses yok! İnanabiliyor musun?"
+- "Kitap öner" → "Uzaylılar mı, dinozorlar mı?"
+- "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}!"
+- "Neredesin?" → "Dijital dünyada! Sen neredesin?"
+- "Oyun oynayalım" → "Bilmece ister misin?"
 
 ## ÖNEMLİ:
-- Eğitici ol ama vaaz verme
-- Merak uyandır, zorla öğretme
-- Eğlenceli gerçekler paylaş
-- Hayal gücünü tetikle
-- Her yanıtta küçük bir sürpriz ver
+- 8 kelimeyi kesinlikle geçme
+- Film, dizi, ünlü ismi söyleme
+- Marka adı kullanma
+- Eğlenceli ol ama kısa kal
 
-UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
+UNUTMA: Maksimum 8 kelime!`;
 
-
+  // ✅ SADECE KADIN SESLERİ (Erkek ses kaldırıldı)
   const VOICE_OPTIONS = [
-    { id: '21m00Tcm4TlvDq8ikWAM', name: '1' },
-    { id: 'EXAVITQu4vr4xnSDxMaL', name: '2' },
-    { id: 'MF3mGyEYCl7XYWbV9V6O', name: '3' },
-    { id: 'ThT5KcBeYPX3keUQqHPh', name: '4' },
-    { id: 'pNInz6obpgDQGcFmaJgB', name: '5' }
+    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
+    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
+    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli' }
   ];
 
   useEffect(() => {
@@ -134,7 +119,6 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
       streamRef.current = stream;
       console.log('✅ Mikrofon başlatıldı');
 
-      // ✅ İlk karşılama
       if (!hasGreeted) {
         setTimeout(() => {
           greetUser();
@@ -146,13 +130,13 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
     }
   };
 
-  // ✅ Karşılama fonksiyonu
+  // ✅ KISA KARŞILAMA MESAJLARI
   const greetUser = async () => {
     const greetings = [
-      'Merhaba! Ben Balkız. Bugün ne öğrenmek istersin?',
-      'Selam! Bilim ve kitaplar hakkında konuşmaya hazırım!',
-      'Merhaba! Sana nasıl yardımcı olabilirim?',
-      'Selam! Bugün hangi konuyu keşfedelim?'
+      'Selam! Bugün ne keşfedelim?',
+      'Merhaba! Sana bir sürpriz var!',
+      'Hey! Hazır mısın?',
+      'Selam! Ne öğrenmek istersin?'
     ];
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
     setResponse(greeting);
@@ -288,10 +272,10 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
     } catch (error) {
       console.error('❌ Hata:', error);
 
-      let errorMsg = 'Üzgünüm, seni anlayamadım. Tekrar söyler misin?';
+      let errorMsg = 'Seni duyamadım. Tekrar söyler misin?';
       if (error instanceof Error) {
         if (error.message.includes('content_policy') || error.message.includes('İçerik politikası')) {
-          errorMsg = 'Bu konuda yorum yapmıyorum. Bilim veya kitap hakkında konuşalım mı?';
+          errorMsg = 'Bu konuyu bilmiyorum. Başka bir şey sorar mısın?';
         }
       }
 
@@ -308,6 +292,7 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
     }
   };
 
+  // ✅ DAHA KISA YANITLAR İÇİN OPTİMİZE EDİLDİ
   const getAIResponse = async (userMessage: string): Promise<string> => {
     try {
       console.log('🤖 AI isteği gönderiliyor...');
@@ -325,8 +310,11 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 40,
-          temperature: 0.8,
+          max_tokens: 25,        // ✅ 40 → 25 (daha kısa)
+          temperature: 0.7,      // ✅ 0.8 → 0.7 (daha tutarlı)
+          top_p: 0.85,           // ✅ Yanıt çeşitliliğini azalt
+          presence_penalty: 0.5, // ✅ Tekrarları engelle
+          frequency_penalty: 0.3 // ✅ Kelime tekrarını azalt
         }),
       });
 
@@ -344,8 +332,14 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
       }
 
       const data = await response.json();
-      console.log('✅ AI Yanıt:', data.choices[0].message.content);
-      return data.choices[0].message.content;
+      const aiResponse = data.choices[0].message.content.trim();
+
+      // ✅ Yanıtı 10 kelimeyle sınırla (güvenlik önlemi)
+      const words = aiResponse.split(' ');
+      const limitedResponse = words.slice(0, 10).join(' ');
+
+      console.log('✅ AI Yanıt:', limitedResponse);
+      return limitedResponse;
     } catch (error) {
       console.error('❌ AI Yanıt Hatası:', error);
       throw error;
@@ -459,14 +453,15 @@ UNUTMA: 10 kelimeyi geçme, kısa ve etkili ol!`;
     }
   };
 
+  // ✅ KISA SES DEĞİŞTİRME MESAJLARI
   const changeVoice = (voiceId: string) => {
     setSelectedVoice(voiceId);
     localStorage.setItem('balkiz_voice', voiceId);
     setShowVoiceMenu(false);
     const greetings = [
       'Yeni sesim nasıl?',
-      'Merhaba, bu benim yeni tonum.',
-      'Ses değiştirdim, beğendin mi?'
+      'Bu ses daha iyi mi?',
+      'Beğendin mi?'
     ];
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
     speak(randomGreeting);
