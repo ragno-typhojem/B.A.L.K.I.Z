@@ -9,7 +9,7 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('21m00Tcm4TlvDq8ikWAM');
+  const [selectedVoice, setSelectedVoice] = useState('xyqF3vGMQlPk3e7yA4DI');
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
@@ -380,7 +380,7 @@ UNUTMA: Maksimum 14 kelime!`;
           },
           body: JSON.stringify({
             text: text,
-            model_id: 'eleven_multilingual_v2',
+            model_id: 'eleven_flash_v2_5', // Daha doğal ses için gelişmiş model
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.8,
