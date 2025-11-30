@@ -1,73 +1,57 @@
-# React + TypeScript + Vite
+# 🎬 B.A.L.K.I.Z - Bionic AI Assistant
+Bilim Araştırmacısı Logik Kadın İnovatif Zekâ
+Türkçe ses tanıma ve yapay zeka destekli, futuristik arayüzlü bir AI asistanı.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## ✨ Özellikler
 
-Currently, two official plugins are available:
+- 🎨 **Futuristik Arayüz** - Animasyonlu orbital halkalar, waveform görselleştirme
+- 🎤 **Gerçek Zamanlı Türkçe Ses Tanıma** - Web Speech API
+- 🤖 **Groq API Entegrasyonu** - Llama 3.1 70B modeli
+- 🔊 **ElevenLabs TTS**
+- 📊 **Sistem Panelleri** - Durum göstergeleri ve aktivite günlüğü
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Hızlı Başlangıç
 
-## React Compiler
+```bash
+# Kurulum
+npm install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# Geliştirme
+npm run dev
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Production build
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🔧 Yapılandırma
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Kullandığınız github env ortamında, (bizimki netlify) API anahtarlarınızı güncelleyin:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```typescript
+const GROQ_API_KEY = 'your_groq_api_key_here';
+const ELEVENLABS_API_KEY = 'your_elevenlabs_api_key_here';
 ```
+
+## 📦 Teknoloji Stack'i
+
+- React 18 + TypeScript
+- Vite
+- Web Speech API
+- Groq API (LLM)
+- ElevenLabs API (TTS)
+- Lucide React (İkonlar)
+
+## 📱 Kullanım
+
+1. Sayfayı aç → Boot animasyonu başlar
+2. Merkez butona tıkla → Dinlemeye başla
+3. Türkçe konuş → AI yanıt verir
+4. Sağ üstten ses seç → Farklı sesler
+
+## 📄 Lisans
+
+MIT Lisansı
+
+---
+
+**⭐ Katkı Sağla -- Geliştiriciye geri dönüş ver.**
