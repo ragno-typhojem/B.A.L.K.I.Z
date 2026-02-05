@@ -28,8 +28,7 @@ const App = () => {
  
   // ✅ COQUI TTS SES SEÇENEKLERİ (Hugging Face üzerinden)
   const VOICE_OPTIONS = [
-    { id: 'facebook/mms-tts-tur', name: 'Türkçe Kadın (MMS)' },
-    { id: 'coqui/XTTS-v2', name: 'Coqui XTTS v2 (Çok Dilli)' },
+  { id: 'microsoft/speecht5_tts', name: 'Türkçe Kadın' },
   ];
 
   const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.

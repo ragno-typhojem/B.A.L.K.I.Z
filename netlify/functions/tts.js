@@ -1,6 +1,4 @@
 // netlify/functions/tts.js
-// Node.js 18+ native fetch kullanıyor, node-fetch gereksiz
-
 exports.handler = async (event) => {
   // CORS headers
   const headers = {
@@ -50,9 +48,9 @@ exports.handler = async (event) => {
 
     console.log('🔊 TTS Request:', { text, model });
 
-    // ✅ YENİ URL: router.huggingface.co
+    // ✅ YENİ API ENDPOINT
     const response = await fetch(
-      `https://router.huggingface.co/models/${model}`,
+      `https://api-inference.huggingface.co/models/${model}`,
       {
         method: 'POST',
         headers: {
@@ -61,9 +59,6 @@ exports.handler = async (event) => {
         },
         body: JSON.stringify({
           inputs: text,
-          options: {
-            wait_for_model: true,
-          },
         }),
       }
     );
@@ -95,7 +90,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         audio: base64Audio,
-        contentType: response.headers.get('content-type') || 'audio/wav',
+        contentType: response.headers.get('content-type') || 'audio/flac',
       }),
     };
   } catch (error) {
