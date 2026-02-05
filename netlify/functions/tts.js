@@ -19,8 +19,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { text, voice = 'v2/tr_speaker_0' } = JSON.parse(event.body);
-    const HF_TOKEN = process.env.VITE_HF_TOKEN;
+    const { text } = JSON.parse(event.body);
 
     if (!text) {
       return {
@@ -30,59 +29,31 @@ exports.handler = async (event) => {
       };
     }
 
-    if (!HF_TOKEN) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'HF_TOKEN not configured' }),
-      };
-    }
+    console.log('🔊 XTTS-v2 Request:', { text });
 
-    console.log('🔊 Bark TTS Request:', { text, voice });
-
-    // ✅ YENİ URL: router.huggingface.co
+    // ✅ Coqui XTTS-v2 - Hugging Face Space API
     const response = await fetch(
-      'https://router.huggingface.co/models/suno/bark',
+      'https://hcsolakoglu-orkhon-tts.hf.space/api/predict',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${HF_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: text,
-          parameters: {
-            voice_preset: voice,
-          },
+          data: [
+            text, // Metin
+            'tr', // Dil: Türkçe
+            null, // Referans ses (null = default kadın sesi)
+          ],
         }),
       }
     );
 
-    console.log('📊 Bark Response Status:', response.status);
+    console.log('📊 XTTS Response Status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Bark Error:', errorText);
-      
-      // Model yükleniyor ise bekle
-      if (response.status === 503) {
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.estimated_time) {
-            return {
-              statusCode: 503,
-              headers,
-              body: JSON.stringify({ 
-                error: 'Model loading',
-                estimated_time: errorData.estimated_time,
-                message: `Model yükleniyor, ${errorData.estimated_time} saniye bekleyin`
-              }),
-            };
-          }
-        } catch (e) {
-          // JSON parse hatası
-        }
-      }
+      console.error('❌ XTTS Error:', errorText);
       
       return {
         statusCode: response.status,
@@ -91,10 +62,19 @@ exports.handler = async (event) => {
       };
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    const result = await response.json();
+    
+    // Hugging Face Space API response format
+    const audioUrl = result.data[0]; // Audio file URL
+    
+    console.log('✅ Audio URL:', audioUrl);
+
+    // Audio dosyasını indir
+    const audioResponse = await fetch(audioUrl);
+    const audioBuffer = await audioResponse.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
-    console.log('✅ Audio generated, size:', audioBuffer.byteLength);
+    console.log('✅ Audio downloaded, size:', audioBuffer.byteLength);
 
     return {
       statusCode: 200,
@@ -104,7 +84,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         audio: base64Audio,
-        contentType: response.headers.get('content-type') || 'audio/wav',
+        contentType: 'audio/wav',
       }),
     };
   } catch (error) {

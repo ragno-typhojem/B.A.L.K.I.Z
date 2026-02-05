@@ -9,8 +9,6 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('v2/tr_speaker_0'); // ✅ Türkçe model
-  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
   const [bootProgress, setBootProgress] = useState(0);
@@ -26,14 +24,6 @@ const App = () => {
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
  
-  // ✅ COQUI TTS SES SEÇENEKLERİ (Hugging Face üzerinden)
-const VOICE_OPTIONS = [
-  { id: 'v2/tr_speaker_0', name: 'Türkçe Kadın 1 (Genç)' },
-  { id: 'v2/tr_speaker_2', name: 'Türkçe Kadın 2 (Orta Yaş)' },
-  { id: 'v2/tr_speaker_4', name: 'Türkçe Kadın 3 (Olgun)' },
-  { id: 'v2/tr_speaker_6', name: 'Türkçe Kadın 4 (Enerjik)' },
-  { id: 'v2/tr_speaker_8', name: 'Türkçe Kadın 5 (Sakin)' },
-];
 
   const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.
 
@@ -55,9 +45,6 @@ YASAK KONULAR: Din, siyaset, ırk, cinsellik, popüler kültür (film/dizi/ünl�
 UNUTMA: 14 kelimeyi asla geçme!`;
 
   useEffect(() => {
-    const savedVoice = localStorage.getItem('balkiz_voice');
-    if (savedVoice) setSelectedVoice(savedVoice);
-
     let progress = 0;
     const bootInterval = setInterval(() => {
       progress += 2;
@@ -334,18 +321,17 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
-// ✅ Netlify Function ile TTS (CORS sorunu yok)
+// ✅ Orkhon-TTS ile TTS (voice parametresi YOK)
 const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
   startAudioVisualization();
 
   return new Promise(async (resolve, reject) => {
     try {
-      console.log('🔊 TTS isteği gönderiliyor...');
+      console.log('🔊 Orkhon-TTS isteği gönderiliyor...');
       console.log('📝 Metin:', text);
-      console.log('🎤 Model:', selectedVoice);
 
-      // ✅ Netlify Function'a istek gönder
+      // ✅ Netlify Function'a istek gönder (voice parametresi YOK)
       const response = await fetch('/.netlify/functions/tts', {
         method: 'POST',
         headers: {
@@ -353,7 +339,7 @@ const speak = async (text: string): Promise<void> => {
         },
         body: JSON.stringify({
           text: text,
-          voice: selectedVoice,
+          // ❌ voice: selectedVoice, // KALDIR - Orkhon-TTS'de yok
         }),
       });
 
@@ -363,13 +349,13 @@ const speak = async (text: string): Promise<void> => {
         const errorData = await response.json();
         console.error('❌ Hata:', errorData);
 
-        // Model yükleniyor
-        if (response.status === 503) {
-          console.log('⏳ Model yükleniyor, 15 saniye bekleniyor...');
+        // Gradio Space yükleniyor olabilir
+        if (response.status === 503 || response.status === 500) {
+          console.log('⏳ Space yükleniyor, 10 saniye bekleniyor...');
           setError('Model hazırlanıyor...');
-          await new Promise(resolve => setTimeout(resolve, 15000));
+          await new Promise(resolve => setTimeout(resolve, 10000));
           setError('');
-          return speak(text);
+          return speak(text); // Retry
         }
 
         throw new Error(`TTS error: ${response.status}`);
@@ -429,7 +415,6 @@ const speak = async (text: string): Promise<void> => {
 };
 
 
-
   const stopSpeaking = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -437,19 +422,6 @@ const speak = async (text: string): Promise<void> => {
       setIsSpeaking(false);
       setAudioLevel(0);
     }
-  };
-
-  const changeVoice = (voiceId: string) => {
-    setSelectedVoice(voiceId);
-    localStorage.setItem('balkiz_voice', voiceId);
-    setShowVoiceMenu(false);
-    const greetings = [
-      'Yeni sesim nasıl?',
-      'Bu ses daha iyi mi?',
-      'Beğendin mi?'
-    ];
-    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-    speak(randomGreeting);
   };
 
   const ParticleAnimation = () => {
@@ -601,27 +573,8 @@ const speak = async (text: string): Promise<void> => {
           </div>
         </div>
 
-        <button className="voice-btn" onClick={() => setShowVoiceMenu(!showVoiceMenu)}>
-          <Volume2 size={18} /> {VOICE_OPTIONS.find(v => v.id === selectedVoice)?.name}
-        </button>
       </header>
 
-      {showVoiceMenu && (
-        <div className="voice-menu">
-          <div className="voice-menu-header">
-            <Zap size={16} /> SES SEÇ
-          </div>
-          {VOICE_OPTIONS.map(voice => (
-            <button
-              key={voice.id}
-              className={`voice-option ${selectedVoice === voice.id ? 'active' : ''}`}
-              onClick={() => changeVoice(voice.id)}
-            >
-              {voice.name} {selectedVoice === voice.id && '✓'}
-            </button>
-          ))}
-        </div>
-      )}
 
       <main className="main">
         <div className="interface-container">
