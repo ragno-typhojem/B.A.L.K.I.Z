@@ -40,9 +40,9 @@ exports.handler = async (event) => {
 
     console.log('🔊 Bark TTS Request:', { text, voice });
 
-    // ✅ Suno Bark - Çok dilli TTS (GARANTİ ÇALIŞAN)
+    // ✅ YENİ URL: router.huggingface.co
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/suno/bark',
+      'https://router.huggingface.co/models/suno/bark',
       {
         method: 'POST',
         headers: {
@@ -52,7 +52,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           inputs: text,
           parameters: {
-            voice_preset: voice, // Türkçe kadın sesi
+            voice_preset: voice,
           },
         }),
       }
@@ -64,19 +64,23 @@ exports.handler = async (event) => {
       const errorText = await response.text();
       console.error('❌ Bark Error:', errorText);
       
-      // Eğer model yükleniyor ise bekle
+      // Model yükleniyor ise bekle
       if (response.status === 503) {
-        const errorData = JSON.parse(errorText);
-        if (errorData.estimated_time) {
-          return {
-            statusCode: 503,
-            headers,
-            body: JSON.stringify({ 
-              error: 'Model loading',
-              estimated_time: errorData.estimated_time,
-              message: `Model yükleniyor, ${errorData.estimated_time} saniye bekleyin`
-            }),
-          };
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.estimated_time) {
+            return {
+              statusCode: 503,
+              headers,
+              body: JSON.stringify({ 
+                error: 'Model loading',
+                estimated_time: errorData.estimated_time,
+                message: `Model yükleniyor, ${errorData.estimated_time} saniye bekleyin`
+              }),
+            };
+          }
+        } catch (e) {
+          // JSON parse hatası
         }
       }
       
