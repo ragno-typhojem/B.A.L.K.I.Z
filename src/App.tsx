@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Volume2, VolumeX, Radio, Zap, Activity, Cpu } from 'lucide-react';
+import { HfInference } from '@huggingface/inference';
 import ilkyarLogo from './assets/ilkyar_logo.png';
 import './App.css';
 
@@ -9,7 +10,7 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('EXAVITQu4vr4xnSDxMaL'); // ✅ Varsayılan Bella
+  const [selectedVoice, setSelectedVoice] = useState('facebook/mms-tts-tur'); // ✅ Türkçe model
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
@@ -25,14 +26,12 @@ const App = () => {
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-  const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+  const HF_TOKEN = import.meta.env.VITE_HF_TOKEN; // ✅ Hugging Face token
 
-  // ✅ VARSAYILAN ELEVENLABS SESLERİ (Ücretsiz planda çalışır)
+  // ✅ COQUI TTS SES SEÇENEKLERİ (Hugging Face üzerinden)
   const VOICE_OPTIONS = [
-    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella (Kadın)' },
-    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel (Kadın)' },
-    { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte (Kadın)' },
-    { id: '8WPhqbK1tiExOyeiOUT0', name: 'Özel Ses (Kadın)' }, // ✅ Sizin sesiniz
+    { id: 'facebook/mms-tts-tur', name: 'Türkçe Kadın (MMS)' },
+    { id: 'coqui/XTTS-v2', name: 'Coqui XTTS v2 (Çok Dilli)' },
   ];
 
   const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.
@@ -334,56 +333,33 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
-  // ✅ ELEVENLABS TTS (Detaylı hata yönetimi)
+  // ✅ COQUI TTS (Hugging Face ile)
   const speak = async (text: string): Promise<void> => {
     setIsSpeaking(true);
     startAudioVisualization();
 
     return new Promise(async (resolve, reject) => {
       try {
-        console.log('🔊 TTS isteği gönderiliyor...');
+        console.log('🔊 Coqui TTS isteği gönderiliyor...');
         console.log('📝 Konuşulacak metin:', text);
-        console.log('🎤 Voice ID:', selectedVoice);
-        console.log('🔑 API Key (ilk 10 karakter):', ELEVENLABS_API_KEY?.substring(0, 10));
+        console.log('🎤 Model:', selectedVoice);
 
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'audio/mpeg',
-            'Content-Type': 'application/json',
-            'xi-api-key': ELEVENLABS_API_KEY
-          },
-          body: JSON.stringify({
-            text: text,
-            model_id: 'eleven_turbo_v2', // ✅ Ücretsiz planda çalışır
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75
-            }
-          })
+        const hf = new HfInference(HF_TOKEN);
+        
+        // ✅ Hugging Face TTS API
+        const response = await hf.textToSpeech({
+          model: selectedVoice,
+          inputs: text
         });
 
-        console.log('📊 ElevenLabs Response Status:', response.status);
+        console.log('✅ TTS yanıtı alındı');
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ ElevenLabs Hata Detayı:', errorText);
-          
-          try {
-            const errorJson = JSON.parse(errorText);
-            console.error('❌ Hata JSON:', errorJson);
-          } catch (e) {
-            console.error('❌ Ham hata:', errorText);
-          }
-
-          setIsSpeaking(false);
-          setAudioLevel(0);
-          reject(new Error(`Audio error: ${response.status}`));
-          return;
-        }
-
-        const audioBlob = await response.blob();
+        const audioBlob = response;
         console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
+
+        if (audioBlob.size < 100) {
+          throw new Error('Audio blob çok küçük');
+        }
 
         const audioUrl = URL.createObjectURL(audioBlob);
 
