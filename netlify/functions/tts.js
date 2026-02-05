@@ -48,9 +48,9 @@ exports.handler = async (event) => {
 
     console.log('🔊 TTS Request:', { text, model });
 
-    // ✅ YENİ API ENDPOINT
+    // ✅ YENİ URL: router.huggingface.co
     const response = await fetch(
-      `https://api-inference.huggingface.co/models/${model}`,
+      `https://router.huggingface.co/models/${model}`,
       {
         method: 'POST',
         headers: {
