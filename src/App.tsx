@@ -9,7 +9,7 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('tr-TR-AhmetNeural'); // ✅ Ücretsiz ses
+  const [selectedVoice, setSelectedVoice] = useState('EXAVITQu4vr4xnSDxMaL'); // ✅ Varsayılan Bella
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
@@ -23,14 +23,16 @@ const App = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null); // ✅ Web Speech API
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+  const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
-  // ✅ ÜCRETSIZ SES SEÇENEKLERİ (Web Speech API)
+  // ✅ VARSAYILAN ELEVENLABS SESLERİ (Ücretsiz planda çalışır)
   const VOICE_OPTIONS = [
-    { id: 'tr-TR-AhmetNeural', name: 'Ahmet (Erkek)' },
-    { id: 'tr-TR-EmelNeural', name: 'Emel (Kadın)' },
+    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella (Kadın)' },
+    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel (Kadın)' },
+    { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte (Kadın)' },
+    { id: '8WPhqbK1tiExOyeiOUT0', name: 'Özel Ses (Kadın)' }, // ✅ Sizin sesiniz
   ];
 
   const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.
@@ -50,21 +52,11 @@ YASAK KONULAR: Din, siyaset, ırk, cinsellik, popüler kültür (film/dizi/ünl�
 "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}!"
 "Oyun oynayalım" → "Bilmece ister misin?"
 
-ESPRİ ÖRNEKLERİ:
-- Uzaylılar partilere gitmez, Dünya'ya ayak uyduramazlar!
-- Robot müzik dinler, ritim devrelerinde akar!
-- Matematik kitabı üzgün, çok problemi var!
-
 UNUTMA: 14 kelimeyi asla geçme!`;
 
   useEffect(() => {
     const savedVoice = localStorage.getItem('balkiz_voice');
     if (savedVoice) setSelectedVoice(savedVoice);
-
-    // ✅ Web Speech API başlat
-    if ('speechSynthesis' in window) {
-      synthRef.current = window.speechSynthesis;
-    }
 
     let progress = 0;
     const bootInterval = setInterval(() => {
@@ -87,7 +79,6 @@ UNUTMA: 14 kelimeyi asla geçme!`;
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (audioRef.current) audioRef.current.pause();
       if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
-      if (synthRef.current) synthRef.current.cancel();
     };
   }, []);
 
@@ -205,13 +196,12 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
-  // ✅ DÜZELTİLDİ: whisper-large-v3 (Türkçe destekli)
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsProcessing(true);
     try {
       const formData = new FormData();
       formData.append('file', audioBlob, 'audio.webm');
-      formData.append('model', 'whisper-large-v3'); // ✅ Türkçe destekli model
+      formData.append('model', 'whisper-large-v3');
       formData.append('language', 'tr');
       formData.append('response_format', 'json');
       formData.append('temperature', '0');
@@ -344,55 +334,84 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
-  // ✅ ÜCRETSIZ TTS: Web Speech API
+  // ✅ ELEVENLABS TTS (Detaylı hata yönetimi)
   const speak = async (text: string): Promise<void> => {
     setIsSpeaking(true);
     startAudioVisualization();
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
-        if (!synthRef.current) {
-          throw new Error('Web Speech API desteklenmiyor');
-        }
-
         console.log('🔊 TTS isteği gönderiliyor...');
         console.log('📝 Konuşulacak metin:', text);
+        console.log('🎤 Voice ID:', selectedVoice);
+        console.log('🔑 API Key (ilk 10 karakter):', ELEVENLABS_API_KEY?.substring(0, 10));
 
-        // ✅ Önceki konuşmayı durdur
-        synthRef.current.cancel();
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': ELEVENLABS_API_KEY
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: 'eleven_turbo_v2', // ✅ Ücretsiz planda çalışır
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75
+            }
+          })
+        });
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'tr-TR';
-        utterance.rate = 1.0;  // Konuşma hızı
-        utterance.pitch = 1.0; // Ses tonu
-        utterance.volume = 1.0; // Ses seviyesi
+        console.log('📊 ElevenLabs Response Status:', response.status);
 
-        // ✅ Türkçe ses seç
-        const voices = synthRef.current.getVoices();
-        const turkishVoice = voices.find(voice => 
-          voice.lang === 'tr-TR' || voice.lang.startsWith('tr')
-        );
-        if (turkishVoice) {
-          utterance.voice = turkishVoice;
-          console.log('✅ Türkçe ses bulundu:', turkishVoice.name);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ ElevenLabs Hata Detayı:', errorText);
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.error('❌ Hata JSON:', errorJson);
+          } catch (e) {
+            console.error('❌ Ham hata:', errorText);
+          }
+
+          setIsSpeaking(false);
+          setAudioLevel(0);
+          reject(new Error(`Audio error: ${response.status}`));
+          return;
         }
 
-        utterance.onend = () => {
+        const audioBlob = await response.blob();
+        console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+        }
+
+        audioRef.current.src = audioUrl;
+
+        audioRef.current.onended = () => {
           console.log('✅ Ses tamamlandı');
+          URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
           setAudioLevel(0);
           resolve();
         };
 
-        utterance.onerror = (e) => {
+        audioRef.current.onerror = (e) => {
           console.error('❌ Ses Oynatma Hatası:', e);
+          URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
           setAudioLevel(0);
           reject(new Error('Audio playback failed'));
         };
 
         console.log('▶️ Ses oynatılıyor...');
-        synthRef.current.speak(utterance);
+        await audioRef.current.play();
+        console.log('✅ Ses oynatma başladı');
 
       } catch (error) {
         console.error('❌ Konuşma Hatası:', error);
@@ -404,8 +423,9 @@ UNUTMA: 14 kelimeyi asla geçme!`;
   };
 
   const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       setIsSpeaking(false);
       setAudioLevel(0);
     }
