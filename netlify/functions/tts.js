@@ -1,4 +1,6 @@
 // netlify/functions/tts.js
+const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -6,93 +8,52 @@ exports.handler = async (event) => {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
-  }
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
     const { text } = JSON.parse(event.body);
 
-    if (!text) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing text' }),
-      };
-    }
+    if (!text) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Metin yok' }) };
 
-    console.log('🔊 XTTS-v2 Request:', { text });
+    console.log('🔊 Neural TTS İsteği (Emel):', text);
 
-    // ✅ Coqui XTTS-v2 - Hugging Face Space API
-    const response = await fetch(
-      'https://hcsolakoglu-orkhon-tts.hf.space/api/predict',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: [
-            text, // Metin
-            'tr', // Dil: Türkçe
-            null, // Referans ses (null = default kadın sesi)
-          ],
-        }),
+    // Microsoft Edge TTS Başlat
+    const tts = new MsEdgeTTS();
+    
+    // ✅ SES AYARI: "tr-TR-EmelNeural" (En gerçekçi Türkçe Kadın Sesi)
+    // Alternatif: "tr-TR-NestleNeural" (Daha reklam/tanıtım tonunda)
+    await tts.setMetadata("tr-TR-EmelNeural", OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+
+    // Stream'i Buffer'a çeviren yardımcı fonksiyon
+    const streamToBuffer = async (stream) => {
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
       }
-    );
+      return Buffer.concat(chunks);
+    };
 
-    console.log('📊 XTTS Response Status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ XTTS Error:', errorText);
-      
-      return {
-        statusCode: response.status,
-        headers,
-        body: JSON.stringify({ error: errorText }),
-      };
-    }
-
-    const result = await response.json();
+    // Sesi oluştur
+    const readableStream = tts.toStream(text);
+    const audioBuffer = await streamToBuffer(readableStream);
     
-    // Hugging Face Space API response format
-    const audioUrl = result.data[0]; // Audio file URL
-    
-    console.log('✅ Audio URL:', audioUrl);
+    // Base64'e çevir
+    const base64Audio = audioBuffer.toString('base64');
 
-    // Audio dosyasını indir
-    const audioResponse = await fetch(audioUrl);
-    const audioBuffer = await audioResponse.arrayBuffer();
-    const base64Audio = Buffer.from(audioBuffer).toString('base64');
-
-    console.log('✅ Audio downloaded, size:', audioBuffer.byteLength);
+    console.log('✅ Emel sesi hazırlandı! Boyut:', audioBuffer.length);
 
     return {
       statusCode: 200,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         audio: base64Audio,
-        contentType: 'audio/wav',
+        contentType: 'audio/mpeg',
       }),
     };
+
   } catch (error) {
-    console.error('❌ Function Error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error.message }),
-    };
+    console.error('❌ TTS Hatası:', error);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
   }
 };

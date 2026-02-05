@@ -320,18 +320,17 @@ UNUTMA: 14 kelimeyi asla geçme!`;
       throw error;
     }
   };
-
-// ✅ Orkhon-TTS ile TTS (voice parametresi YOK)
+// ✅ Microsoft Edge TTS (Emel) Bağlantısı
 const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
   startAudioVisualization();
 
   return new Promise(async (resolve, reject) => {
     try {
-      console.log('🔊 Orkhon-TTS isteği gönderiliyor...');
+      console.log('🔊 Emel Sesi İsteği Gönderiliyor...');
       console.log('📝 Metin:', text);
 
-      // ✅ Netlify Function'a istek gönder (voice parametresi YOK)
+      // Backend'e istek at (voice parametresine gerek yok, backend'de Emel sabit)
       const response = await fetch('/.netlify/functions/tts', {
         method: 'POST',
         headers: {
@@ -339,7 +338,6 @@ const speak = async (text: string): Promise<void> => {
         },
         body: JSON.stringify({
           text: text,
-          // ❌ voice: selectedVoice, // KALDIR - Orkhon-TTS'de yok
         }),
       });
 
@@ -348,23 +346,13 @@ const speak = async (text: string): Promise<void> => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('❌ Hata:', errorData);
-
-        // Gradio Space yükleniyor olabilir
-        if (response.status === 503 || response.status === 500) {
-          console.log('⏳ Space yükleniyor, 10 saniye bekleniyor...');
-          setError('Model hazırlanıyor...');
-          await new Promise(resolve => setTimeout(resolve, 10000));
-          setError('');
-          return speak(text); // Retry
-        }
-
         throw new Error(`TTS error: ${response.status}`);
       }
 
       const { audio, contentType } = await response.json();
-      console.log('📦 Audio alındı, Content-Type:', contentType);
+      console.log('📦 Ses verisi alındı, Tür:', contentType);
 
-      // Base64'ü Blob'a çevir
+      // Base64'ü sese çevir
       const binaryString = atob(audio);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -372,10 +360,8 @@ const speak = async (text: string): Promise<void> => {
       }
       const audioBlob = new Blob([bytes], { type: contentType });
 
-      console.log('📦 Blob boyutu:', audioBlob.size);
-
       if (audioBlob.size < 100) {
-        throw new Error('Ses dosyası çok küçük');
+        throw new Error('Ses dosyası hatalı veya boş');
       }
 
       const audioUrl = URL.createObjectURL(audioBlob);
@@ -386,35 +372,37 @@ const speak = async (text: string): Promise<void> => {
 
       audioRef.current.src = audioUrl;
 
+      // Oynatma bitince yapılacaklar
       audioRef.current.onended = () => {
-        console.log('✅ Ses bitti');
+        console.log('✅ Konuşma bitti');
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         setAudioLevel(0);
         resolve();
       };
 
+      // Hata olursa
       audioRef.current.onerror = (e) => {
         console.error('❌ Oynatma hatası:', e);
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         setAudioLevel(0);
-        reject(new Error('Oynatma başarısız'));
+        // Hata olsa bile akışı bozmamak için resolve ediyoruz
+        resolve();
       };
 
       await audioRef.current.play();
-      console.log('✅ Oynatılıyor');
+      console.log('✅ Oynatılıyor...');
 
     } catch (error) {
       console.error('❌ TTS Hatası:', error);
       setIsSpeaking(false);
       setAudioLevel(0);
-      reject(error);
+      // Hata durumunda reject etmiyoruz, resolve ediyoruz ki program kilitlenmesin
+      resolve(); 
     }
   });
 };
-
-
   const stopSpeaking = () => {
     if (audioRef.current) {
       audioRef.current.pause();
