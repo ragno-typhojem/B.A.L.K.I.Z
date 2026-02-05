@@ -325,7 +325,7 @@ const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
   startAudioVisualization();
 
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async (resolve) => {
     try {
       console.log('🔊 Emel Sesi İsteği Gönderiliyor...');
       console.log('📝 Metin:', text);
