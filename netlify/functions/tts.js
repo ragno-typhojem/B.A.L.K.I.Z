@@ -1,5 +1,5 @@
 // netlify/functions/tts.js
-const fetch = require('node-fetch');
+// Node.js 18+ native fetch kullanıyor, node-fetch gereksiz
 
 exports.handler = async (event) => {
   // CORS headers
@@ -82,10 +82,10 @@ exports.handler = async (event) => {
     }
 
     // Get audio buffer
-    const audioBuffer = await response.buffer();
-    const base64Audio = audioBuffer.toString('base64');
+    const audioBuffer = await response.arrayBuffer();
+    const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
-    console.log('✅ Audio generated, size:', audioBuffer.length);
+    console.log('✅ Audio generated, size:', audioBuffer.byteLength);
 
     return {
       statusCode: 200,
