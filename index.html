@@ -1,13 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- ✅ CSP FIX -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://api.elevenlabs.io; media-src 'self' blob: data: https:;">
-
-    <title>B.A.L.K.I.Z</title>
+    
+    <!-- ✅ CSP Meta Tag (Headers'dan öncelikli) -->
+    <meta http-equiv="Content-Security-Policy" 
+          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://api-inference.huggingface.co; media-src 'self' blob: data: https:;">
+    
+    <title>B.A.L.K.I.Z - Biyonik Yapay Zeka</title>
   </head>
   <body>
     <div id="root"></div>
