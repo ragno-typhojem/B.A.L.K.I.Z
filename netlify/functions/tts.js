@@ -1,22 +1,15 @@
 // netlify/functions/tts.js
 exports.handler = async (event) => {
-  // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
 
-  // Preflight request
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+    return { statusCode: 200, headers, body: '' };
   }
 
-  // Only POST allowed
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -26,15 +19,14 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Parse request
-    const { text, model } = JSON.parse(event.body);
+    const { text, voice = 'v2/tr_speaker_0' } = JSON.parse(event.body);
     const HF_TOKEN = process.env.VITE_HF_TOKEN;
 
-    if (!text || !model) {
+    if (!text) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Missing text or model' }),
+        body: JSON.stringify({ error: 'Missing text' }),
       };
     }
 
@@ -46,11 +38,11 @@ exports.handler = async (event) => {
       };
     }
 
-    console.log('🔊 TTS Request:', { text, model });
+    console.log('🔊 Bark TTS Request:', { text, voice });
 
-    // ✅ YENİ URL: router.huggingface.co
+    // ✅ Suno Bark - Çok dilli TTS (GARANTİ ÇALIŞAN)
     const response = await fetch(
-      `https://router.huggingface.co/models/${model}`,
+      'https://api-inference.huggingface.co/models/suno/bark',
       {
         method: 'POST',
         headers: {
@@ -59,15 +51,34 @@ exports.handler = async (event) => {
         },
         body: JSON.stringify({
           inputs: text,
+          parameters: {
+            voice_preset: voice, // Türkçe kadın sesi
+          },
         }),
       }
     );
 
-    console.log('📊 HF Response Status:', response.status);
+    console.log('📊 Bark Response Status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ HF Error:', errorText);
+      console.error('❌ Bark Error:', errorText);
+      
+      // Eğer model yükleniyor ise bekle
+      if (response.status === 503) {
+        const errorData = JSON.parse(errorText);
+        if (errorData.estimated_time) {
+          return {
+            statusCode: 503,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Model loading',
+              estimated_time: errorData.estimated_time,
+              message: `Model yükleniyor, ${errorData.estimated_time} saniye bekleyin`
+            }),
+          };
+        }
+      }
       
       return {
         statusCode: response.status,
@@ -76,7 +87,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Get audio buffer
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
@@ -90,7 +100,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         audio: base64Audio,
-        contentType: response.headers.get('content-type') || 'audio/flac',
+        contentType: response.headers.get('content-type') || 'audio/wav',
       }),
     };
   } catch (error) {

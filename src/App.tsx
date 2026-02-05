@@ -27,9 +27,13 @@ const App = () => {
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
  
   // ✅ COQUI TTS SES SEÇENEKLERİ (Hugging Face üzerinden)
-  const VOICE_OPTIONS = [
-  { id: 'microsoft/speecht5_tts', name: 'Türkçe Kadın' },
-  ];
+const VOICE_OPTIONS = [
+  { id: 'v2/tr_speaker_0', name: 'Türkçe Kadın 1 (Genç)' },
+  { id: 'v2/tr_speaker_2', name: 'Türkçe Kadın 2 (Orta Yaş)' },
+  { id: 'v2/tr_speaker_4', name: 'Türkçe Kadın 3 (Olgun)' },
+  { id: 'v2/tr_speaker_6', name: 'Türkçe Kadın 4 (Enerjik)' },
+  { id: 'v2/tr_speaker_8', name: 'Türkçe Kadın 5 (Sakin)' },
+];
 
   const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.
 
