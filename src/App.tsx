@@ -332,56 +332,62 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
- // ✅ COQUI TTS (Direkt Fetch ile - CSP sorunu yok)
+// ✅ Netlify Function ile TTS (CORS sorunu yok)
 const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
   startAudioVisualization();
 
   return new Promise(async (resolve, reject) => {
     try {
-      console.log('🔊 Coqui TTS isteği gönderiliyor...');
-      console.log('📝 Konuşulacak metin:', text);
+      console.log('🔊 TTS isteği gönderiliyor...');
+      console.log('📝 Metin:', text);
       console.log('🎤 Model:', selectedVoice);
 
-      // ✅ Direkt Hugging Face Inference API
-      const response = await fetch(
-        `https://api-inference.huggingface.co/models/${selectedVoice}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${HF_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: text
-          })
-        }
-      );
+      // ✅ Netlify Function'a istek gönder
+      const response = await fetch('/.netlify/functions/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: text,
+          model: selectedVoice,
+        }),
+      });
 
-      console.log('📊 TTS Response Status:', response.status);
+      console.log('📊 Status:', response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ TTS Hatası:', errorText);
-        
-        // ✅ Model yükleniyor hatası
+        const errorData = await response.json();
+        console.error('❌ Hata:', errorData);
+
+        // Model yükleniyor
         if (response.status === 503) {
-          setError('Model yükleniyor, 20 saniye bekleyin...');
-          setTimeout(() => speak(text), 20000);
-          return;
+          console.log('⏳ Model yükleniyor, 15 saniye bekleniyor...');
+          setError('Model hazırlanıyor...');
+          await new Promise(resolve => setTimeout(resolve, 15000));
+          setError('');
+          return speak(text);
         }
-        
-        setIsSpeaking(false);
-        setAudioLevel(0);
-        reject(new Error(`TTS error: ${response.status}`));
-        return;
+
+        throw new Error(`TTS error: ${response.status}`);
       }
 
-      const audioBlob = await response.blob();
-      console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
+      const { audio, contentType } = await response.json();
+      console.log('📦 Audio alındı, Content-Type:', contentType);
+
+      // Base64'ü Blob'a çevir
+      const binaryString = atob(audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const audioBlob = new Blob([bytes], { type: contentType });
+
+      console.log('📦 Blob boyutu:', audioBlob.size);
 
       if (audioBlob.size < 100) {
-        throw new Error('Audio blob çok küçük');
+        throw new Error('Ses dosyası çok küçük');
       }
 
       const audioUrl = URL.createObjectURL(audioBlob);
@@ -393,7 +399,7 @@ const speak = async (text: string): Promise<void> => {
       audioRef.current.src = audioUrl;
 
       audioRef.current.onended = () => {
-        console.log('✅ Ses tamamlandı');
+        console.log('✅ Ses bitti');
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         setAudioLevel(0);
@@ -401,25 +407,25 @@ const speak = async (text: string): Promise<void> => {
       };
 
       audioRef.current.onerror = (e) => {
-        console.error('❌ Ses Oynatma Hatası:', e);
+        console.error('❌ Oynatma hatası:', e);
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         setAudioLevel(0);
-        reject(new Error('Audio playback failed'));
+        reject(new Error('Oynatma başarısız'));
       };
 
-      console.log('▶️ Ses oynatılıyor...');
       await audioRef.current.play();
-      console.log('✅ Ses oynatma başladı');
+      console.log('✅ Oynatılıyor');
 
     } catch (error) {
-      console.error('❌ Konuşma Hatası:', error);
+      console.error('❌ TTS Hatası:', error);
       setIsSpeaking(false);
       setAudioLevel(0);
       reject(error);
     }
   });
 };
+
 
 
   const stopSpeaking = () => {
