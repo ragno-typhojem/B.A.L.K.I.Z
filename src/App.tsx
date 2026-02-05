@@ -9,7 +9,7 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('facebook/mms-tts-tur'); // ✅ Türkçe model
+  const [selectedVoice, setSelectedVoice] = useState('v2/tr_speaker_0'); // ✅ Türkçe model
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
@@ -353,7 +353,7 @@ const speak = async (text: string): Promise<void> => {
         },
         body: JSON.stringify({
           text: text,
-          model: selectedVoice,
+          voice: selectedVoice,
         }),
       });
 
