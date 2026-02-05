@@ -96,7 +96,7 @@ UNUTMA: Maksimum 14 kelime!`;
 
   // sadece 1 tane gerçekçi kadın sesi eklendi
   const VOICE_OPTIONS = [
-    { id: 'xyqF3vGMQlPk3e7yA4DI', name: 'Balkiz' },
+    { id: '2thYbn2sOGtiTwd9QwWH', name: 'Balkiz' },
 
   ];
 
