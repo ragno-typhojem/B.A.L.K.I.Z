@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Volume2, VolumeX, Radio, Zap, Activity, Cpu } from 'lucide-react';
-import { HfInference } from '@huggingface/inference';
 import ilkyarLogo from './assets/ilkyar_logo.png';
 import './App.css';
 
