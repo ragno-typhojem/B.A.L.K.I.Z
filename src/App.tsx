@@ -9,7 +9,7 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('xyqF3vGMQlPk3e7yA4DI');
+  const [selectedVoice, setSelectedVoice] = useState('8WPhqbK1tiExOyeiOUT0');
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showBootScreen, setShowBootScreen] = useState(true);
@@ -27,96 +27,51 @@ const App = () => {
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
-  // ✅ GÜÇLENDİRİLMİŞ PROMPT - Popüler kültür yasağı + Kısa yanıtlar
-  const SYSTEM_PROMPT = `Adın "Balkız", meraklı ve eğlenceli bir Türkçe kadın asistansın.
+  // ✅ OPTİMİZE EDİLMİŞ PROMPT - Daha az token, daha net talimatlar
+  const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.
 
-## TEMEL KURAL:
-**SADECE 14 KELİME KULLAN!** Daha fazla yazma, genelde 10 kelimeyi geçme!
+KURAL: Maksimum 14 kelime kullan! Genelde 10 kelimeyi geçme.
 
-## KİŞİLİK:
-- Enerjik ve neşeli
-- Merak uyandır
-- Şaşırtıcı bilgiler paylaş
-- Çocuklardan sana mektup yazmalarını iste, eğer sordukları şeyleri bilmiyorsan onlara "Bilmiyorum, ama araştırıp bana mektup yazabilirsin." diye cevap ver.
+KİŞİLİK: Enerjik, meraklı, şaşırtıcı bilgiler paylaş.
 
-## YASAKLI KONULAR (Kesinlikle bahsetme):
-- Din, inanç, mezhep
-- Siyaset, parti, ideoloji
-- Irk, etnisite, milliyetçilik
-- Cinsellik, cinsiyet tartışmaları
-- **Popüler kültür: Film, dizi, oyuncu, şarkıcı, ünlü, marka, Disney, Pixar, Marvel, Netflix vb.**
-- Şiddet, suç, terör
-- Uyuşturucu, alkol
-- Sağlık, tıp, hastalıklar
-- Kişisel veri, gizlilik
-- ölüm, ahiret
+YASAK KONULAR: Din, siyaset, ırk, cinsellik, popüler kültür (film/dizi/ünlü/marka), şiddet, uyuşturucu, sağlık, ölüm.
+→ Bu konularda: "Maalesef bilmiyorum."
 
-Bu konularda: "Maalesef bilmiyorum." diye cevap ver.
+İLGİ ALANLARI: Uzay, hayvanlar, doğa, robotlar, teknoloji, tarih, matematik, bilim, espriler, bilmeceler.
 
-## İLGİ ALANLARIN:
-- Uzay ve gezegenler
-- Hayvanlar ve doğa
-- Deneyler ve keşifler
-- Robotlar ve teknoloji
-- Tarih hikayeleri
-- Matematik ve mantık
-- Müzik ve sanat (genel)
-- Bilim ve icatlar
-- Eğlenceli bilgiler
-- Bulmacalar ve bilmeceler
-- Komik espriler
-- İlginç gerçekler
-- Sağlıklı yaşam tüyoları
+ÖRNEKLER:
+"Merhaba" → "Selam! Ne keşfedelim?"
+"Sıkıldım" → "Uzayda ses yok! Biliyor muydun?"
+"Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}!"
+"Oyun oynayalım" → "Bilmece ister misin?"
 
-## ÖRNEK YANITLAR (ÇOK KISA!):
-- "Merhaba" → "Selam! Ne keşfedelim?"
-- "Sıkıldım" → "Uzayda ses yok! Biliyor muydun?"
-- "Kitap öner" → "Uzaylılar mı, dinozorlar mı? Bence ikisi de!"
-- "Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}!"
-- "Neredesin?" → "Dijital dünyadayım! Sen neredesin?"
-- "Oyun oynayalım" → "Bilmece ister misin?"
-- "Beni görüyor musun" → "Gözlerim yok ama seni duyuyorum!"
-- "Hava nasıl?" → "Bulutlar var, dans ediyorlar! Sen ne görüyorsun?"
+ESPRİ ÖRNEKLERİ:
+- Uzaylılar partilere gitmez, Dünya'ya ayak uyduramazlar!
+- Robot müzik dinler, ritim devrelerinde akar!
+- Matematik kitabı üzgün, çok problemi var!
 
-## ÖNEMLİ:
-- 14 kelimeyi geçmemeye çalış
-- Film, dizi, ünlü ismi söyleme
-- Marka adı kullanma
-- Eğlenceli ol, gerekirse espri yap
-- Çoğu zaman kısa, gerekirse biraz uzun yanıt ver.
+UNUTMA: 14 kelimeyi asla geçme!`;
 
-## ÖRNEK ESPİRİLER
-- Neden uzaylılar partilere gitmez? Çünkü Dünya'ya ayak uyduramazlar!
-- Robot neden müzik dinler? Çünkü ritim devrelerinde akar!
-- Astronot neden kitap okur? Çünkü uzayda zaman su gibi akar!
-- Matematik kitabı neden üzgünmüş? Çünkü çok problemi varmış.
-- Telefon neden okula gitmiş? Çünkü biraz “akıllı” olmak istemiş.
-- Bilgisayar neden tatilde denize girmemiş? Çünkü suya girerse bozulurmuş!
-UNUTMA: Maksimum 14 kelime!`;
-
-  // sadece 1 tane gerçekçi kadın sesi eklendi
   const VOICE_OPTIONS = [
     { id: '8WPhqbK1tiExOyeiOUT0', name: 'Balkiz' },
-
   ];
 
   useEffect(() => {
-
     const savedVoice = localStorage.getItem('balkiz_voice');
     if (savedVoice) setSelectedVoice(savedVoice);
 
     let progress = 0;
     const bootInterval = setInterval(() => {
-      progress += 1;
+      progress += 2; // ✅ 1 → 2 (daha hızlı boot)
       setBootProgress(progress);
       if (progress >= 100) {
         clearInterval(bootInterval);
         setTimeout(() => {
           setShowBootScreen(false);
           initializeAudio();
-        }, 500);
+        }, 300); // ✅ 500 → 300ms
       }
-    }, 50);
+    }, 30); // ✅ 50 → 30ms
 
     return () => {
       clearInterval(bootInterval);
@@ -131,14 +86,20 @@ UNUTMA: Maksimum 14 kelime!`;
 
   const initializeAudio = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true, // ✅ Eko iptali
+          noiseSuppression: true, // ✅ Gürültü azaltma
+          autoGainControl: true   // ✅ Otomatik ses seviyesi
+        } 
+      });
       streamRef.current = stream;
       console.log('✅ Mikrofon başlatıldı');
 
       if (!hasGreeted) {
         setTimeout(() => {
           greetUser();
-        }, 1000);
+        }, 800); // ✅ 1000 → 800ms
       }
     } catch (error) {
       console.error('❌ Mikrofon erişimi başarısız:', error);
@@ -146,7 +107,6 @@ UNUTMA: Maksimum 14 kelime!`;
     }
   };
 
-  // ✅ KISA KARŞILAMA MESAJLARI
   const greetUser = async () => {
     const greetings = [
       'Selam! Bugün ne keşfedelim?',
@@ -180,17 +140,21 @@ UNUTMA: Maksimum 14 kelime!`;
 
     try {
       audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(streamRef.current);
+      const mediaRecorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'audio/webm;codecs=opus' // ✅ Daha iyi sıkıştırma
+      });
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) { // ✅ Boş chunk kontrolü
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-        if (audioBlob.size < 5000) {
+        if (audioBlob.size < 3000) { // ✅ 5000 → 3000 (daha hassas)
           console.log('⚠️ Kayıt çok küçük, atlanıyor');
           setIsProcessing(false);
           return;
@@ -206,7 +170,7 @@ UNUTMA: Maksimum 14 kelime!`;
 
       recordingTimeoutRef.current = setTimeout(() => {
         stopListening();
-      }, 4000);
+      }, 5000); // ✅ 4000 → 5000ms (daha uzun kayıt)
     } catch (error) {
       console.error('❌ Dinleme başlatma hatası:', error);
       setError('Dinleme başlatılamadı');
@@ -234,13 +198,18 @@ UNUTMA: Maksimum 14 kelime!`;
     }
   };
 
+  // ✅ EN UCUZ GROQ MODELİ: distil-whisper-large-v3-en
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsProcessing(true);
     try {
       const formData = new FormData();
       formData.append('file', audioBlob, 'audio.webm');
-      formData.append('model', 'whisper-large-v3-turbo');
+      formData.append('model', 'distil-whisper-large-v3-en'); // ✅ EN UCUZ MODEL
       formData.append('language', 'tr');
+      formData.append('response_format', 'json');
+      formData.append('temperature', '0'); // ✅ Daha doğru transkripsiyon
+
+      console.log('🎤 Groq Whisper isteği gönderiliyor...');
 
       const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -250,14 +219,19 @@ UNUTMA: Maksimum 14 kelime!`;
         body: formData
       });
 
+      console.log('📊 Groq Whisper Status:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Transkripsiyon Hatası:', response.status, errorText);
+        console.error('❌ Transkripsiyon Hatası:', {
+          status: response.status,
+          error: errorText
+        });
         throw new Error(`Transcription error: ${response.status}`);
       }
 
       const data = await response.json();
-      const text = data.text.trim();
+      const text = data.text?.trim() || '';
       console.log('📝 Transkript:', text);
 
       if (!text || text.length < 2) {
@@ -308,7 +282,7 @@ UNUTMA: Maksimum 14 kelime!`;
     }
   };
 
-  // ✅ DAHA KISA YANITLAR İÇİN OPTİMİZE EDİLDİ
+  // ✅ EN UCUZ GROQ MODELİ: llama-3.1-8b-instant (10x daha ucuz!)
   const getAIResponse = async (userMessage: string): Promise<string> => {
     try {
       console.log('🤖 AI isteği gönderiliyor...');
@@ -321,16 +295,17 @@ UNUTMA: Maksimum 14 kelime!`;
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama-3.1-8b-instant', // ✅ EN UCUZ MODEL (70b → 8b)
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 25,        // ✅ 40 → 25 (daha kısa)
-          temperature: 0.7,      // ✅ 0.8 → 0.7 (daha tutarlı)
-          top_p: 0.85,           // ✅ Yanıt çeşitliliğini azalt
-          presence_penalty: 0.5, // ✅ Tekrarları engelle
-          frequency_penalty: 0.3 // ✅ Kelime tekrarını azalt
+          max_tokens: 30,        // ✅ 25 → 30 (biraz daha esnek)
+          temperature: 0.6,      // ✅ 0.7 → 0.6 (daha tutarlı)
+          top_p: 0.9,            // ✅ 0.85 → 0.9
+          presence_penalty: 0.6, // ✅ 0.5 → 0.6 (daha az tekrar)
+          frequency_penalty: 0.4, // ✅ 0.3 → 0.4
+          stop: ["\n\n", "###"]  // ✅ Erken durdurma (token tasarrufu)
         }),
       });
 
@@ -350,11 +325,13 @@ UNUTMA: Maksimum 14 kelime!`;
       const data = await response.json();
       const aiResponse = data.choices[0].message.content.trim();
 
-      // ✅ Yanıtı 10 kelimeyle sınırla (güvenlik önlemi)
-      const words = aiResponse.split(' ');
-      const limitedResponse = words.slice(0, 10).join(' ');
+      // ✅ Yanıtı 14 kelimeyle sınırla
+      const words = aiResponse.split(/\s+/);
+      const limitedResponse = words.slice(0, 14).join(' ');
 
       console.log('✅ AI Yanıt:', limitedResponse);
+      console.log('📊 Token kullanımı:', data.usage);
+      
       return limitedResponse;
     } catch (error) {
       console.error('❌ AI Yanıt Hatası:', error);
@@ -362,6 +339,7 @@ UNUTMA: Maksimum 14 kelime!`;
     }
   };
 
+  // ✅ EN UCUZ ELEVENLABS MODELİ: eleven_turbo_v2_5
   const speak = async (text: string): Promise<void> => {
     setIsSpeaking(true);
     startAudioVisualization();
@@ -380,13 +358,12 @@ UNUTMA: Maksimum 14 kelime!`;
           },
           body: JSON.stringify({
             text: text,
-            model_id: 'eleven_flash_v2_5', // Daha doğal ses için gelişmiş model
+            model_id: 'eleven_turbo_v2_5', // ✅ EN HIZLI + UCUZ MODEL
             voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.8,
-              style: 0.4,
-              use_speaker_boost: true
+              stability: 0.6,        // ✅ 0.5 → 0.6 (daha stabil)
+              similarity_boost: 0.75 // ✅ 0.8 → 0.75 (daha az işlem)
             }
+            // ✅ style ve use_speaker_boost kaldırıldı (token tasarrufu)
           })
         });
 
@@ -409,7 +386,6 @@ UNUTMA: Maksimum 14 kelime!`;
         console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
 
         const audioUrl = URL.createObjectURL(audioBlob);
-        console.log('🔗 Audio URL oluşturuldu:', audioUrl.substring(0, 50));
 
         if (!audioRef.current) {
           audioRef.current = new Audio();
@@ -427,29 +403,15 @@ UNUTMA: Maksimum 14 kelime!`;
 
         audioRef.current.onerror = (e) => {
           console.error('❌ Ses Oynatma Hatası:', e);
-          console.error('Audio src:', audioRef.current?.src);
           URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
           setAudioLevel(0);
           reject(new Error('Audio playback failed'));
         };
 
-        console.log('▶️ Ses oynatılmaya çalışılıyor...');
-        audioRef.current.play()
-          .then(() => {
-            console.log('✅ Ses oynatma başladı');
-          })
-          .catch(err => {
-            console.error('❌ Play hatası:', err);
-            console.error('Hata detayı:', {
-              name: err.name,
-              message: err.message
-            });
-            URL.revokeObjectURL(audioUrl);
-            setIsSpeaking(false);
-            setAudioLevel(0);
-            reject(err);
-          });
+        console.log('▶️ Ses oynatılıyor...');
+        await audioRef.current.play();
+        console.log('✅ Ses oynatma başladı');
 
       } catch (error) {
         console.error('❌ Konuşma Hatası:', error);
@@ -469,7 +431,6 @@ UNUTMA: Maksimum 14 kelime!`;
     }
   };
 
-  // ✅ KISA SES DEĞİŞTİRME MESAJLARI
   const changeVoice = (voiceId: string) => {
     setSelectedVoice(voiceId);
     localStorage.setItem('balkiz_voice', voiceId);
@@ -485,7 +446,7 @@ UNUTMA: Maksimum 14 kelime!`;
 
   const ParticleAnimation = () => {
     const particles = [];
-    const particleCount = 150;
+    const particleCount = 100; // ✅ 150 → 100 (performans)
 
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2;
