@@ -25,8 +25,7 @@ const App = () => {
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-  const HF_TOKEN = import.meta.env.VITE_HF_TOKEN; // ✅ Hugging Face token
-
+ 
   // ✅ COQUI TTS SES SEÇENEKLERİ (Hugging Face üzerinden)
   const VOICE_OPTIONS = [
     { id: 'facebook/mms-tts-tur', name: 'Türkçe Kadın (MMS)' },
