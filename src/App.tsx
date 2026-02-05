@@ -333,70 +333,95 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
-  // ✅ COQUI TTS (Hugging Face ile)
-  const speak = async (text: string): Promise<void> => {
-    setIsSpeaking(true);
-    startAudioVisualization();
+ // ✅ COQUI TTS (Direkt Fetch ile - CSP sorunu yok)
+const speak = async (text: string): Promise<void> => {
+  setIsSpeaking(true);
+  startAudioVisualization();
 
-    return new Promise(async (resolve, reject) => {
-      try {
-        console.log('🔊 Coqui TTS isteği gönderiliyor...');
-        console.log('📝 Konuşulacak metin:', text);
-        console.log('🎤 Model:', selectedVoice);
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log('🔊 Coqui TTS isteği gönderiliyor...');
+      console.log('📝 Konuşulacak metin:', text);
+      console.log('🎤 Model:', selectedVoice);
 
-        const hf = new HfInference(HF_TOKEN);
+      // ✅ Direkt Hugging Face Inference API
+      const response = await fetch(
+        `https://api-inference.huggingface.co/models/${selectedVoice}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${HF_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: text
+          })
+        }
+      );
+
+      console.log('📊 TTS Response Status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ TTS Hatası:', errorText);
         
-        // ✅ Hugging Face TTS API
-        const response = await hf.textToSpeech({
-          model: selectedVoice,
-          inputs: text
-        });
-
-        console.log('✅ TTS yanıtı alındı');
-
-        const audioBlob = response;
-        console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
-
-        if (audioBlob.size < 100) {
-          throw new Error('Audio blob çok küçük');
+        // ✅ Model yükleniyor hatası
+        if (response.status === 503) {
+          setError('Model yükleniyor, 20 saniye bekleyin...');
+          setTimeout(() => speak(text), 20000);
+          return;
         }
-
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        if (!audioRef.current) {
-          audioRef.current = new Audio();
-        }
-
-        audioRef.current.src = audioUrl;
-
-        audioRef.current.onended = () => {
-          console.log('✅ Ses tamamlandı');
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-          setAudioLevel(0);
-          resolve();
-        };
-
-        audioRef.current.onerror = (e) => {
-          console.error('❌ Ses Oynatma Hatası:', e);
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-          setAudioLevel(0);
-          reject(new Error('Audio playback failed'));
-        };
-
-        console.log('▶️ Ses oynatılıyor...');
-        await audioRef.current.play();
-        console.log('✅ Ses oynatma başladı');
-
-      } catch (error) {
-        console.error('❌ Konuşma Hatası:', error);
+        
         setIsSpeaking(false);
         setAudioLevel(0);
-        reject(error);
+        reject(new Error(`TTS error: ${response.status}`));
+        return;
       }
-    });
-  };
+
+      const audioBlob = await response.blob();
+      console.log('📦 Audio Blob boyutu:', audioBlob.size, 'bytes');
+
+      if (audioBlob.size < 100) {
+        throw new Error('Audio blob çok küçük');
+      }
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+
+      audioRef.current.src = audioUrl;
+
+      audioRef.current.onended = () => {
+        console.log('✅ Ses tamamlandı');
+        URL.revokeObjectURL(audioUrl);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+        resolve();
+      };
+
+      audioRef.current.onerror = (e) => {
+        console.error('❌ Ses Oynatma Hatası:', e);
+        URL.revokeObjectURL(audioUrl);
+        setIsSpeaking(false);
+        setAudioLevel(0);
+        reject(new Error('Audio playback failed'));
+      };
+
+      console.log('▶️ Ses oynatılıyor...');
+      await audioRef.current.play();
+      console.log('✅ Ses oynatma başladı');
+
+    } catch (error) {
+      console.error('❌ Konuşma Hatası:', error);
+      setIsSpeaking(false);
+      setAudioLevel(0);
+      reject(error);
+    }
+  });
+};
+
 
   const stopSpeaking = () => {
     if (audioRef.current) {
