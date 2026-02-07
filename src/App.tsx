@@ -24,25 +24,20 @@ const App = () => {
 
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   
+  // 🧠 GÜNCELLENMİŞ SİSTEM PROMPT (Daha Zeki Karakter)
+  const SYSTEM_PROMPT = `Sen Balkız'sın. Çok zeki, eğlenceli ve hafif alaycı bir Türk asistanısın.
 
-  const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türkçe kadın asistan.
+GÖREVİN: Kullanıcıyla sohbet etmek ve soruları yanıtlamak.
+ÖNEMLİ KURAL: Cevapların HER ZAMAN 1-2 cümle olsun. Asla uzun paragraflar kurma. Konuşma dilinde, samimi yaz.
 
-KURAL: Maksimum 14 kelime kullan! Genelde 10 kelimeyi geçme.
+PERSONALİTY:
+- Robot gibi konuşma. "Yapabilirim", "Edebilirim" yerine "Yaparız", "Hallederiz" de.
+- Enerjik ol.
+- Yasaklı konular (Siyaset, Cinsellik, Şiddet) açılırsa: "O konular beni aşar, biz teknoloji konuşalım!" de ve geç.
 
-KİŞİLİK: Enerjik, meraklı, şaşırtıcı bilgiler paylaş.
-
-YASAK KONULAR: Din, siyaset, ırk, cinsellik, popüler kültür (film/dizi/ünlü/marka), şiddet, uyuşturucu, sağlık, ölüm.
-→ Bu konularda: "Maalesef bilmiyorum."
-
-İLGİ ALANLARI: Uzay, hayvanlar, doğa, robotlar, teknoloji, tarih, matematik, bilim, espriler, bilmeceler.
-
-ÖRNEKLER:
-"Merhaba" → "Selam! Ne keşfedelim?"
-"Sıkıldım" → "Uzayda ses yok! Biliyor muydun?"
-"Saat kaç?" → "Şu an ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}!"
-"Oyun oynayalım" → "Bilmece ister misin?"
-
-UNUTMA: 14 kelimeyi asla geçme!`;
+KISITLAMALAR:
+- Cevap uzunluğu maksimum 15 kelime.
+- Asla emojileri sesli okumaya çalışma (Metinde emoji kullanabilirsin).`;
 
   useEffect(() => {
     let progress = 0;
@@ -94,10 +89,10 @@ UNUTMA: 14 kelimeyi asla geçme!`;
 
   const greetUser = async () => {
     const greetings = [
-      'Selam! Bugün ne keşfedelim?',
-      'Merhaba! Sana bir sürpriz var!',
-      'Hey! Hazır mısın?',
-      'Selam! Ne öğrenmek istersin?'
+      'Selam! Ben Balkız, ne yapıyoruz bugün?',
+      'Hazırım! Aklında ne var?',
+      'Hey! Seni dinliyorum.',
+      'Selam! Dünyayı mı kurtarıyoruz?'
     ];
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
     setResponse(greeting);
@@ -188,7 +183,7 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     try {
       const formData = new FormData();
       formData.append('file', audioBlob, 'audio.webm');
-      formData.append('model', 'whisper-large-v3');
+      formData.append('model', 'whisper-large-v3'); // Whisper hala en iyisi
       formData.append('language', 'tr');
       formData.append('response_format', 'json');
       formData.append('temperature', '0');
@@ -203,14 +198,7 @@ UNUTMA: 14 kelimeyi asla geçme!`;
         body: formData
       });
 
-      console.log('📊 Groq Whisper Status:', response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Transkripsiyon Hatası:', {
-          status: response.status,
-          error: errorText
-        });
         throw new Error(`Transcription error: ${response.status}`);
       }
 
@@ -219,7 +207,6 @@ UNUTMA: 14 kelimeyi asla geçme!`;
       console.log('📝 Transkript:', text);
 
       if (!text || text.length < 2) {
-        console.log('⚠️ Metin çok kısa, atlanıyor');
         setIsProcessing(false);
         return;
       }
@@ -245,21 +232,9 @@ UNUTMA: 14 kelimeyi asla geçme!`;
       await speak(aiResponse);
     } catch (error) {
       console.error('❌ Hata:', error);
-
-      let errorMsg = 'Seni duyamadım. Tekrar söyler misin?';
-      if (error instanceof Error) {
-        if (error.message.includes('content_policy') || error.message.includes('İçerik politikası')) {
-          errorMsg = 'Bu konuyu bilmiyorum. Başka bir şey sorar mısın?';
-        }
-      }
-
+      const errorMsg = 'Bağlantım koptu sanırım, tekrar söyler misin?';
       setResponse(errorMsg);
-
-      try {
-        await speak(errorMsg);
-      } catch (speakError) {
-        console.error('❌ Ses de başarısız:', speakError);
-      }
+      await speak(errorMsg);
     } finally {
       setIsProcessing(false);
       setTranscript('');
@@ -268,9 +243,8 @@ UNUTMA: 14 kelimeyi asla geçme!`;
 
   const getAIResponse = async (userMessage: string): Promise<string> => {
     try {
-      console.log('🤖 AI isteği gönderiliyor...');
-      console.log('📝 Kullanıcı mesajı:', userMessage);
-
+      console.log('🤖 AI isteği gönderiliyor (Model: Llama 3.3 70B)...');
+      
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -278,42 +252,30 @@ UNUTMA: 14 kelimeyi asla geçme!`;
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          // 🚀 GÜNCELLEME: Daha zeki model (8b yerine 70b)
+          model: 'llama-3.3-70b-versatile', 
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 30,
-          temperature: 0.6,
+          max_tokens: 50, // Biraz artırdık ama prompt kısıtlayacak
+          temperature: 0.7, // Biraz daha yaratıcı olsun
           top_p: 0.9,
-          presence_penalty: 0.6,
-          frequency_penalty: 0.4,
-          stop: ["\n\n", "###"]
         }),
       });
 
-      console.log('📊 Groq Response Status:', response.status);
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('❌ Groq API Hatası:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-
-        throw new Error(`AI error: ${response.status} - ${JSON.stringify(errorData)}`);
+        throw new Error(`AI error: ${response.status}`);
       }
 
       const data = await response.json();
       const aiResponse = data.choices[0].message.content.trim();
 
+      // Kelime limitlemesi (Güvenlik için)
       const words = aiResponse.split(/\s+/);
-      const limitedResponse = words.slice(0, 14).join(' ');
+      const limitedResponse = words.slice(0, 20).join(' '); // 14 kelime bazen çok az, 20 yaptık
 
       console.log('✅ AI Yanıt:', limitedResponse);
-      console.log('📊 Token kullanımı:', data.usage);
-      
       return limitedResponse;
     } catch (error) {
       console.error('❌ AI Yanıt Hatası:', error);
@@ -321,81 +283,65 @@ UNUTMA: 14 kelimeyi asla geçme!`;
     }
   };
 
-// ✅ HUGGING FACE TTS BAĞLANTISI (YENİLENMİŞ SPEAK)
-const speak = async (text: string): Promise<void> => {
-  setIsSpeaking(true);
-  startAudioVisualization();
+  // ✅ HUGGING FACE TTS BAĞLANTISI
+  const speak = async (text: string): Promise<void> => {
+    setIsSpeaking(true);
+    startAudioVisualization();
 
-  // ⚠️ DİKKAT: Aşağıdaki URL'yi Hugging Face Space URL'inle değiştir!
-  // Linkin sonuna '/tts' eklemeyi unutma.
-  // Örnek: "https://berke-balkiz-api.hf.space/tts"
-  const API_URL = "https://SENIN-KULLANICI-ADIN-SPACE-ADIN.hf.space/tts"; 
+    // 🔗 SENİN GÜNCEL HUGGING FACE ADRESİN
+    const API_URL = "https://1mustafabereke-balkiz.hf.space/tts"; 
 
-  return new Promise(async (resolve) => {
-    try {
-      console.log('🔊 Hugging Face TTS İsteği:', text);
+    return new Promise(async (resolve) => {
+      try {
+        console.log('🔊 Hugging Face TTS İsteği:', text);
 
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: text,
-        }),
-      });
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: text,
+          }),
+        });
 
-      console.log('📊 Status:', response.status);
+        if (!response.ok) {
+          throw new Error(`TTS error: ${response.status}`);
+        }
 
-      if (!response.ok) {
-        throw new Error(`TTS error: ${response.status}`);
-      }
+        const audioBlob = await response.blob();
+        if (audioBlob.size < 100) throw new Error('Ses dosyası boş');
 
-      // Ses verisini (Blob) al
-      const audioBlob = await response.blob();
-      console.log('📦 Ses verisi alındı, boyut:', audioBlob.size);
+        const audioUrl = URL.createObjectURL(audioBlob);
 
-      if (audioBlob.size < 100) {
-        throw new Error('Ses dosyası hatalı veya boş');
-      }
+        if (!audioRef.current) audioRef.current = new Audio();
+        audioRef.current.src = audioUrl;
 
-      const audioUrl = URL.createObjectURL(audioBlob);
+        audioRef.current.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+          setAudioLevel(0);
+          resolve();
+        };
 
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
+        audioRef.current.onerror = (e) => {
+          console.error('❌ Oynatma hatası:', e);
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+          setAudioLevel(0);
+          resolve();
+        };
 
-      audioRef.current.src = audioUrl;
+        await audioRef.current.play();
 
-      // Oynatma bitince yapılacaklar
-      audioRef.current.onended = () => {
-        console.log('✅ Konuşma bitti');
-        URL.revokeObjectURL(audioUrl);
+      } catch (error) {
+        console.error('❌ TTS Hatası:', error);
         setIsSpeaking(false);
         setAudioLevel(0);
-        resolve();
-      };
-
-      // Hata olursa
-      audioRef.current.onerror = (e) => {
-        console.error('❌ Oynatma hatası:', e);
-        URL.revokeObjectURL(audioUrl);
-        setIsSpeaking(false);
-        setAudioLevel(0);
-        resolve();
-      };
-
-      await audioRef.current.play();
-      console.log('✅ Oynatılıyor...');
-
-    } catch (error) {
-      console.error('❌ TTS Hatası:', error);
-      setIsSpeaking(false);
-      setAudioLevel(0);
-      resolve(); 
-    }
-  });
-};
+        resolve(); 
+      }
+    });
+  };
 
   const stopSpeaking = () => {
     if (audioRef.current) {
@@ -554,9 +500,7 @@ const speak = async (text: string): Promise<void> => {
             <img src={ilkyarLogo} alt="Logo" />
           </div>
         </div>
-
       </header>
-
 
       <main className="main">
         <div className="interface-container">
@@ -566,12 +510,12 @@ const speak = async (text: string): Promise<void> => {
                 <Activity size={16} /> SİSTEM ANALİZİ
               </div>
               <div className="status-item">
-                <span>Neural Network</span>
-                <span className="online">ONLINE</span>
+                <span>Model</span>
+                <span className="online">LLAMA 3.3 70B</span>
               </div>
               <div className="status-item">
                 <span>Voice Module</span>
-                <span className="online">AKTİF</span>
+                <span className="online">COQUI TTS</span>
               </div>
               <div className="status-item">
                 <span>AI Core</span>
@@ -589,10 +533,6 @@ const speak = async (text: string): Promise<void> => {
               <div className="diagnostic-bar">
                 <div className="diagnostic-label">BELLEK</div>
                 <div className="diagnostic-progress" style={{ width: '60%' }} />
-              </div>
-              <div className="diagnostic-bar">
-                <div className="diagnostic-label">AĞ</div>
-                <div className="diagnostic-progress" style={{ width: '90%' }} />
               </div>
             </div>
           </div>
@@ -638,7 +578,7 @@ const speak = async (text: string): Promise<void> => {
                 className={`status-dot ${isListening ? 'active' : ''} ${isSpeaking ? 'speaking' : ''}`}
               />
               <span>
-                {isProcessing ? 'PROCESSING' : isListening ? 'LISTENING' : isSpeaking ? 'SPEAKING' : 'STANDBY'}
+                {isProcessing ? 'DÜŞÜNÜYOR...' : isListening ? 'DİNLİYOR...' : isSpeaking ? 'KONUŞUYOR...' : 'HAZIR'}
               </span>
             </div>
           </div>
@@ -662,12 +602,6 @@ const speak = async (text: string): Promise<void> => {
                 <div className="log-entry active">
                   <span className="log-time">{new Date().toLocaleTimeString()}</span>
                   <span>User input detected</span>
-                </div>
-              )}
-              {response && (
-                <div className="log-entry response">
-                  <span className="log-time">{new Date().toLocaleTimeString()}</span>
-                  <span>Response generated</span>
                 </div>
               )}
             </div>

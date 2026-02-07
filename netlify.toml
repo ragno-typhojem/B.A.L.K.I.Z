@@ -1,12 +1,8 @@
 [build]
   command = "npm run build"
-  functions = "netlify/functions"
   publish = "dist"
-
-[functions]
-  node_bundler = "esbuild"
 
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://router.huggingface.co /.netlify/functions/*; media-src 'self' blob: data: https:;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://router.huggingface.co https://*.hf.space https://*.ngrok-free.app /.netlify/functions/*; media-src 'self' blob: data: https:;"
