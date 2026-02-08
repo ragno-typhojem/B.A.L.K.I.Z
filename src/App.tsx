@@ -284,23 +284,40 @@ KISITLAMALAR:
   };
 
 
-  const speak = async (text: string): Promise<void> => {
+const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
   startAudioVisualization();
 
-  // 🔗 SENİN HUGGING FACE TTS ADRESİN
-  const HF_URL = "https://1mustafabereke-balkiz.hf.space/tts";
+  const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+  // "Bella" sesi; enerjik, net ve Balkız karakterine en çok yakışan ses.
+  const VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; 
 
   try {
-    const response = await fetch(HF_URL, {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text })
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY
+      },
+      body: JSON.stringify({
+        text: text,
+        // 🚀 EKONOMİK MOD: Flash modeli v2'den çok daha az kredi harcar ve daha hızlıdır.
+        model_id: "eleven_flash_v2_5", 
+        voice_settings: {
+          stability: 0.45,
+          similarity_boost: 0.6,
+          style: 0.35,
+          use_speaker_boost: true
+        }
+      })
     });
 
-    if (!response.ok) throw new Error(`Sunucu Hatası: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ ElevenLabs Detay:', errorData);
+      throw new Error(`Kredi bitmiş olabilir veya API Hatası: ${response.status}`);
+    }
 
-    // Gelen MP3 dosyasını al ve çal
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     
@@ -316,7 +333,7 @@ KISITLAMALAR:
     await audioRef.current.play();
 
   } catch (error) {
-    console.error('❌ Ses Çalma Hatası:', error);
+    console.error('❌ Balkız Ses Hatası:', error);
     setIsSpeaking(false);
     setIsProcessing(false);
   }
