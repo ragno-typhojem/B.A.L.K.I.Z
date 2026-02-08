@@ -1,6 +1,5 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    # Google'ın API adresini (generativelanguage.googleapis.com) listeye ekledik.
-    # Ayrıca ses dosyalarını çalabilmek için audio-src kısmına data: ve blob: ekledik.
+    # Google API adresini listeye ekledik ve ses dosyaları için gerekli izinleri verdik
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.groq.com https://*.hf.space https://*.huggingface.co https://generativelanguage.googleapis.com; audio-src 'self' data: blob:;"
