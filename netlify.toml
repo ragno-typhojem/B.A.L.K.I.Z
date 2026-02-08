@@ -1,9 +1,6 @@
-[build]
-  command = "npm run build"
-  publish = "dist"
-
 [[headers]]
   for = "/*"
   [headers.values]
-    # Hugging Face (*.hf.space) adreslerine izin veriyoruz
-    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.groq.com https://*.hf.space https://*.huggingface.co; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' blob: data: https:;"
+    # Google'ın API adresini (generativelanguage.googleapis.com) listeye ekledik.
+    # Ayrıca ses dosyalarını çalabilmek için audio-src kısmına data: ve blob: ekledik.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.groq.com https://*.hf.space https://*.huggingface.co https://generativelanguage.googleapis.com; audio-src 'self' data: blob:;"
