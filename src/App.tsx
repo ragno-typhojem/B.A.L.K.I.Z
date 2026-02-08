@@ -287,62 +287,60 @@ const speak = async (text: string): Promise<void> => {
   setIsSpeaking(true);
   startAudioVisualization();
 
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  // SES SEÇENEKLERİ (Hepsi Kadın):
-  // "Aoede": Enerjik, genç, çok duygulu (Balkız için önerim bu!)
-  // "Kore": Daha sakin, ciddi ama doğal.
-  const VOICE_NAME = "Aoede"; 
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
 
-  return new Promise(async (resolve) => {
-    try {
-      console.log('🗣️ Gemini 2.0 Flash Sesi Üretiliyor:', text);
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Lütfen bu metni doğal ve duygulu bir şekilde seslendir: ${text}` }] }],
-          generationConfig: {
-            response_modalities: ["AUDIO"],
-            speech_config: {
-              voice_config: {
-                prebuilt_voice_config: {
-                  voice_name: VOICE_NAME // Zephyr kalitesindeki Aoede sesi
-                }
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          // Role eklemek bazen 400 hatasını çözer
+          role: "user",
+          parts: [{ text: text }] 
+        }],
+        generationConfig: {
+          // Ses çıkışı istediğimizi belirtiyoruz
+          responseModalities: ["AUDIO"], 
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                // Aoede: Enerjik kadın / Kore: Sakin kadın
+                voiceName: "Aoede" 
               }
             }
           }
-        })
-      });
+        }
+      })
+    });
 
-      if (!response.ok) throw new Error(`Gemini TTS Error: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Google Detaylı Hata:', errorData);
+      throw new Error(`Gemini TTS Error: ${response.status}`);
+    }
 
-      const data = await response.json();
-      const audioBase64 = data.candidates[0].content.parts[0].inline_data.data;
-      
-      const audioUrl = `data:audio/wav;base64,${audioBase64}`;
-      
-      if (!audioRef.current) audioRef.current = new Audio();
-      audioRef.current.src = audioUrl;
+    const data = await response.json();
+    
+    // Google'dan gelen ses verisini ayıklıyoruz
+    const audioBase64 = data.candidates[0].content.parts[0].inline_data.data;
+    const audioUrl = `data:audio/wav;base64,${audioBase64}`;
+    
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.src = audioUrl;
 
-      audioRef.current.onended = () => {
-        setIsSpeaking(false);
-        setAudioLevel(0);
-        setIsProcessing(false);
-        resolve();
-      };
-
-      await audioRef.current.play();
-
-    } catch (error) {
-      console.error('❌ Gemini Ses Hatası:', error);
+    audioRef.current.onended = () => {
       setIsSpeaking(false);
       setAudioLevel(0);
-      setIsProcessing(false);
-      resolve(); 
-    }
-  });
+    };
+
+    await audioRef.current.play();
+
+  } catch (error) {
+    console.error('❌ Ses Hatası:', error);
+    setIsSpeaking(false);
+    setAudioLevel(0);
+  }
 };
 
   const stopSpeaking = () => {
