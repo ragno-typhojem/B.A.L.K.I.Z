@@ -283,65 +283,67 @@ KISITLAMALAR:
     }
   };
 
-  // ✅ HUGGING FACE TTS BAĞLANTISI
-  const speak = async (text: string): Promise<void> => {
-    setIsSpeaking(true);
-    startAudioVisualization();
+const speak = async (text: string): Promise<void> => {
+  setIsSpeaking(true);
+  startAudioVisualization();
 
-    // 🔗 SENİN GÜNCEL HUGGING FACE ADRESİN
-    const API_URL = "https://1mustafabereke-balkiz.hf.space/tts"; 
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  // SES SEÇENEKLERİ (Hepsi Kadın):
+  // "Aoede": Enerjik, genç, çok duygulu (Balkız için önerim bu!)
+  // "Kore": Daha sakin, ciddi ama doğal.
+  const VOICE_NAME = "Aoede"; 
 
-    return new Promise(async (resolve) => {
-      try {
-        console.log('🔊 Hugging Face TTS İsteği:', text);
+  return new Promise(async (resolve) => {
+    try {
+      console.log('🗣️ Gemini 2.0 Flash Sesi Üretiliyor:', text);
 
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: text,
-          }),
-        });
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Lütfen bu metni doğal ve duygulu bir şekilde seslendir: ${text}` }] }],
+          generationConfig: {
+            response_modalities: ["AUDIO"],
+            speech_config: {
+              voice_config: {
+                prebuilt_voice_config: {
+                  voice_name: VOICE_NAME // Zephyr kalitesindeki Aoede sesi
+                }
+              }
+            }
+          }
+        })
+      });
 
-        if (!response.ok) {
-          throw new Error(`TTS error: ${response.status}`);
-        }
+      if (!response.ok) throw new Error(`Gemini TTS Error: ${response.status}`);
 
-        const audioBlob = await response.blob();
-        if (audioBlob.size < 100) throw new Error('Ses dosyası boş');
+      const data = await response.json();
+      const audioBase64 = data.candidates[0].content.parts[0].inline_data.data;
+      
+      const audioUrl = `data:audio/wav;base64,${audioBase64}`;
+      
+      if (!audioRef.current) audioRef.current = new Audio();
+      audioRef.current.src = audioUrl;
 
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        if (!audioRef.current) audioRef.current = new Audio();
-        audioRef.current.src = audioUrl;
-
-        audioRef.current.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-          setAudioLevel(0);
-          resolve();
-        };
-
-        audioRef.current.onerror = (e) => {
-          console.error('❌ Oynatma hatası:', e);
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-          setAudioLevel(0);
-          resolve();
-        };
-
-        await audioRef.current.play();
-
-      } catch (error) {
-        console.error('❌ TTS Hatası:', error);
+      audioRef.current.onended = () => {
         setIsSpeaking(false);
         setAudioLevel(0);
-        resolve(); 
-      }
-    });
-  };
+        setIsProcessing(false);
+        resolve();
+      };
+
+      await audioRef.current.play();
+
+    } catch (error) {
+      console.error('❌ Gemini Ses Hatası:', error);
+      setIsSpeaking(false);
+      setAudioLevel(0);
+      setIsProcessing(false);
+      resolve(); 
+    }
+  });
+};
 
   const stopSpeaking = () => {
     if (audioRef.current) {
