@@ -5,4 +5,5 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://router.huggingface.co https://*.hf.space https://*.ngrok-free.app /.netlify/functions/*; media-src 'self' blob: data: https:;"
+    # Hugging Face (*.hf.space) adreslerine izin veriyoruz
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.groq.com https://*.hf.space https://*.huggingface.co; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' blob: data: https:;"
