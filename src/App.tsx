@@ -290,23 +290,23 @@ const speak = async (text: string): Promise<void> => {
   const key = import.meta.env.VITE_GEMINI_API_KEY;
 
   try {
+    // 🚀 Gemini 2.0 Flash için kesin çalışan REST formatı
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          // Role eklemek bazen 400 hatasını çözer
-          role: "user",
-          parts: [{ text: text }] 
-        }],
-        generationConfig: {
-          // Ses çıkışı istediğimizi belirtiyoruz
-          responseModalities: ["AUDIO"], 
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                // Aoede: Enerjik kadın / Kore: Sakin kadın
-                voiceName: "Aoede" 
+        contents: [
+          {
+            parts: [{ text: text }]
+          }
+        ],
+        // Google v1beta genellikle snake_case (alt çizgili) isimleri daha çok sever
+        generation_config: {
+          response_modalities: ["AUDIO"],
+          speech_config: {
+            voice_config: {
+              prebuilt_voice_config: {
+                voice_name: "Aoede" // Alternatifler: "Kore", "Leda" (Kadın sesleri)
               }
             }
           }
@@ -316,13 +316,14 @@ const speak = async (text: string): Promise<void> => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('❌ Google Detaylı Hata:', errorData);
+      // 🕵️‍♂️ Hatanın tam sebebini burası söyleyecek!
+      console.error('❌ Google API Detayı:', JSON.stringify(errorData, null, 2));
       throw new Error(`Gemini TTS Error: ${response.status}`);
     }
 
     const data = await response.json();
     
-    // Google'dan gelen ses verisini ayıklıyoruz
+    // Google'dan gelen Base64 ses verisi
     const audioBase64 = data.candidates[0].content.parts[0].inline_data.data;
     const audioUrl = `data:audio/wav;base64,${audioBase64}`;
     
@@ -332,6 +333,7 @@ const speak = async (text: string): Promise<void> => {
     audioRef.current.onended = () => {
       setIsSpeaking(false);
       setAudioLevel(0);
+      setIsProcessing(false);
     };
 
     await audioRef.current.play();
@@ -340,6 +342,7 @@ const speak = async (text: string): Promise<void> => {
     console.error('❌ Ses Hatası:', error);
     setIsSpeaking(false);
     setAudioLevel(0);
+    setIsProcessing(false);
   }
 };
 
