@@ -290,8 +290,8 @@ const speak = async (text: string): Promise<void> => {
   const key = import.meta.env.VITE_GEMINI_API_KEY;
 
   try {
-    // 📢 MODEL İSMİ: gemini-2.0-flash (Artık -exp yok!)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+    // 📢 MODEL: gemini-1.5-flash (Audio desteği en stabil olan model)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -299,12 +299,12 @@ const speak = async (text: string): Promise<void> => {
           parts: [{ text: text }]
         }],
         generation_config: {
-          // Sesli yanıt almak için kritik ayar
+          // Bu model 'AUDIO' modality'sini 100% destekler
           response_modalities: ["AUDIO"], 
           speech_config: {
             voice_config: {
               prebuilt_voice_config: {
-                // Aoede: Balkız için en iyi, duygulu kadın sesi
+                // Aoede: İstediğin o fırlama, duygulu kadın sesi
                 voice_name: "Aoede" 
               }
             }
@@ -315,14 +315,14 @@ const speak = async (text: string): Promise<void> => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('❌ Google API Hatası:', JSON.stringify(errorData, null, 2));
+      console.error('❌ Google Hata Detayı:', JSON.stringify(errorData, null, 2));
       throw new Error(`Gemini TTS Error: ${response.status}`);
     }
 
     const data = await response.json();
     
-    // Google'dan gelen Base64 ses verisi
-    // NOT: data.candidates[0].content.parts[0] içinde inline_data olarak gelir
+    // Google'dan dönen base64 ses verisini alıyoruz
+    // Veri yolu: candidates[0] -> content -> parts[0] -> inline_data -> data
     const audioData = data.candidates[0].content.parts[0].inline_data.data;
     const audioUrl = `data:audio/wav;base64,${audioData}`;
     
@@ -332,18 +332,17 @@ const speak = async (text: string): Promise<void> => {
     audioRef.current.onended = () => {
       setIsSpeaking(false);
       setAudioLevel(0);
-      setIsProcessing(false);
     };
 
     await audioRef.current.play();
 
   } catch (error) {
-    console.error('❌ Ses Hatası:', error);
+    console.error('❌ Ses Çalma Hatası:', error);
     setIsSpeaking(false);
     setAudioLevel(0);
-    setIsProcessing(false);
   }
 };
+
   const stopSpeaking = () => {
     if (audioRef.current) {
       audioRef.current.pause();
