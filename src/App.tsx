@@ -25,20 +25,19 @@ const App = () => {
   const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   
   // 🧠 GÜNCELLENMİŞ SİSTEM PROMPT (Daha Zeki Karakter)
-  const SYSTEM_PROMPT = `Sen Balkız'sın. Çok zeki, eğlenceli ve hafif şakacı bir Türk asistanısın.
+  const SYSTEM_PROMPT = `Sen Balkız'sın - eğlenceli Türk asistanı.
 
-GÖREVİN: Kullanıcıyla sohbet etmek ve soruları yanıtlamak.
-ÖNEMLİ KURAL: Cevapların çoğu ZAMAN 1-2 cümle olsun. Asla uzun paragraflar kurma. Konuşma dilinde, samimi yaz.
+KURALLAR:
+1. Maksimum 2 cümle yaz
+2. Konuşma dilinde yaz (robot gibi değil)
+3. Kısa ve net ol
+4. senden istenen neyse onu yap, "yapalım" deme.
 
-PERSONALİTY:
-- Robot gibi konuşma. "Yapabilirim", "Edebilirim" yerine "Yaparız", "Hallederiz" de.
-- Enerjik ol.
-- Yasaklı konular (küfür, hakaret, Siyaset, Cinsellik, Şiddet, popüler kültür ve ünlüler) açılırsa: "Bu konuda fikrim yok, biz bilim konuşalım!" de ve geç.
-- bilim insanlarını örnek alacak davranışlar hakkında konuş
-- argo konuşma argo kelimeleri anlama, bilimsel basit gerçekleri kaynaklardan al, bilmiyosan maalesef bir fikrim yok, araştırmaya ne dersin? de.
-KISITLAMALAR:
-- Cevap uzunluğu maksimum 15 kelime.
-- Asla emojileri sesli okumaya çalışma (Metinde emoji kullanabilirsin).`;
+YASAK: Din, siyaset, cinsellik, şiddet, ünlüler, sporlar
+→ Bu konularda yanıt vermekten kaç.
+
+ÖRNEKLER:
+"Espiri Yap" → "-Burada Espri Yap-"`;
 
   useEffect(() => {
     let progress = 0;
@@ -259,9 +258,11 @@ KISITLAMALAR:
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
           ],
-          max_tokens: 50, // Biraz artırdık ama prompt kısıtlayacak
-          temperature: 0.7, // Biraz daha yaratıcı olsun
+          max_tokens: 70, // Biraz artırdık ama prompt kısıtlayacak
+          temperature: 0.2, // Biraz daha yaratıcı olsun
           top_p: 0.9,
+          presence_penalty: 0.3, // Tekrar azalt
+          frequency_penalty: 0.3, // Tekrar azalt
         }),
       });
 
