@@ -675,3 +675,39 @@ body {
     white-space: normal;
   }
 }
+.visualizer-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px; /* Ortanın yüksekliği */
+}
+
+/* Float ve Dairesel Waveform */
+.floating-ai {
+  transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.1s ease-out;
+  z-index: 10;
+}
+
+.circular-waveform {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.circular-bar {
+  position: absolute;
+  width: 4px;
+  background: #00ffff;
+  border-radius: 4px;
+  transform-origin: bottom center;
+  transition: height 0.05s ease, opacity 0.05s ease, box-shadow 0.05s ease;
+}
