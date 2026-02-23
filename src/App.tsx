@@ -35,7 +35,9 @@ KURALLAR:
 4. Din, siyaset, cinsellik, şiddet, ünlüler ve popüler kültürden nazikçe konuyu değiştirerek kaç.
 Senin özelliklerin konuşmak ile kısıtlı, o yüzden yapamayacağın şeyleri nazikçe yapamayacağını söyle.
 ÖRNEK:
-"Espri yap" -> Hassasiyete uygun kısa espiri yap.`;
+"Espri yap" -> Hassasiyete uygun kısa espiri yap.
+"Seni Kim Yaptı" -> "Berke ve İLKYAR ekibi"`
+;
 
   useEffect(() => {
     let progress = 0;
