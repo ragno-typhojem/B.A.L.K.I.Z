@@ -711,3 +711,93 @@ body {
   transform-origin: bottom center;
   transition: height 0.05s ease, opacity 0.05s ease, box-shadow 0.05s ease;
 }
+
+/* --- YENİ ORGANİK AI ORB (Enerji Topu) --- */
+.visualizer-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+}
+
+.ai-orb-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -75px;
+  margin-left: -75px;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  animation: float-organic 4s ease-in-out infinite;
+}
+
+.core-icon {
+  position: relative;
+  z-index: 20;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+  transition: all 0.3s ease;
+}
+
+/* Katmanların Ortak Özelliği: Amip gibi şekil değiştiren Border-Radius */
+.blob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  mix-blend-mode: screen;
+  filter: blur(12px);
+  opacity: 0.7;
+  transition: all 0.5s ease;
+}
+
+/* HAZIR DURUM (Buz Mavisi / Turkuaz) */
+.blob-1 { background: linear-gradient(to right, #00ffff, #0088ff); animation: morph 4s linear infinite; }
+.blob-2 { background: linear-gradient(to right, #0088ff, #00ffff); animation: morph 5s linear infinite reverse; }
+.blob-3 { background: radial-gradient(circle, #ffffff, #00ffff); animation: morph 6s linear infinite; opacity: 0.5; }
+
+/* DİNLİYOR DURUM (Sıcak Kırmızı / Turuncu) */
+.ai-orb-container.listening .blob-1 { background: linear-gradient(to right, #ff3333, #ff0055); filter: blur(18px); opacity: 0.9; }
+.ai-orb-container.listening .blob-2 { background: linear-gradient(to right, #ff0055, #ff8800); filter: blur(15px); opacity: 0.9; }
+.ai-orb-container.listening .blob-3 { background: radial-gradient(circle, #ffffff, #ff3333); }
+
+/* KONUŞUYOR DURUM (Parlak Turkuaz / Mor - Tam Gemini Live Hissi) */
+.ai-orb-container.speaking .blob-1 { background: linear-gradient(to right, #00ffff, #bc13fe); filter: blur(20px); opacity: 0.9; }
+.ai-orb-container.speaking .blob-2 { background: linear-gradient(to right, #bc13fe, #00ffff); filter: blur(25px); opacity: 0.9; }
+.ai-orb-container.speaking .blob-3 { background: radial-gradient(circle, #ffffff, #00ffff); }
+
+/* DÜŞÜNÜYOR DURUM (Sarı / Yeşil Hızlı Dönüş) */
+.ai-orb-container.processing .blob {
+  background: linear-gradient(to right, #ccff00, #00ffaa);
+  animation-duration: 2s; /* Düşünürken daha hızlı döner */
+}
+
+/* Şekil Değiştirme ve Dönme Animasyonu */
+@keyframes morph {
+  0% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; transform: rotate(0deg) scale(1); }
+  34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; transform: rotate(120deg) scale(1.05); }
+  67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; transform: rotate(240deg) scale(0.95); }
+  100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; transform: rotate(360deg) scale(1); }
+}
+
+@keyframes float-organic {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+.spin {
+  animation: spin 1.5s linear infinite;
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}

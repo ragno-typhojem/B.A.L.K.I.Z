@@ -33,6 +33,7 @@ KURALLAR:
 2. Asla kelimeleri veya cümleleri yarım bırakma.
 3. "Yapıyorum", "ediyorum" gibi robotik onaylar yerine doğrudan eyleme geç veya sonucu söyle.
 4. Din, siyaset, cinsellik, şiddet, ünlüler ve popüler kültürden nazikçe konuyu değiştirerek kaç.
+Senin özelliklerin konuşmak ile kısıtlı, o yüzden yapamayacağın şeyleri nazikçe yapamayacağını söyle.
 ÖRNEK:
 "Espri yap" -> Hassasiyete uygun kısa espiri yap.`;
 
@@ -403,43 +404,28 @@ KURALLAR:
             </div>
           </div>
 
-          <div className="visualizer-section">
-            {/* Dairesel Live AI Waveform */}
-            <div className="circular-waveform">
-              {Array.from({ length: 36 }).map((_, i) => {
-                const angle = (i / 36) * 360;
-                const h = isListening || isSpeaking
-                  ? 10 + Math.sin((i / 36) * Math.PI * 6 + audioLevel * 10) * audioLevel * 50
-                  : 10;
-                return (
-                  <div
-                    key={i}
-                    className="circular-bar"
-                    style={{
-                      transform: `rotate(${angle}deg) translateY(-80px)`,
-                      height: `${h}px`,
-                      opacity: 0.3 + (isListening || isSpeaking ? audioLevel * 0.7 : 0),
-                      boxShadow: isSpeaking ? '0 0 10px #00ffff' : isListening ? '0 0 10px #ff3333' : 'none'
-                    }}
-                  />
-                );
-              })}
-            </div>
-
-            <button
-              className={`core-btn ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''} floating-ai`}
+      <div className="visualizer-section">
+            {/* 🚀 YENİ: Organik, Cin Gibi Hareketli Enerji Topu (Blob) */}
+            <div 
+              className={`ai-orb-container ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''} ${isProcessing ? 'processing' : ''}`}
               onClick={toggleListening}
-              disabled={isProcessing}
               style={{
-                transform: `scale(${1 + audioLevel * 0.3})`,
-                boxShadow: `0 0 ${20 + (audioLevel * 60)}px ${isSpeaking ? 'rgba(0, 255, 255, 0.8)' : isListening ? 'rgba(255, 50, 50, 0.8)' : 'rgba(0, 255, 255, 0.3)'}`
+                transform: `scale(${1 + audioLevel * 0.6})`, // Sese göre nefes alma tepkisi
+                transition: 'transform 0.05s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
             >
-              <div className="core-ring" style={{ opacity: 0.5 + audioLevel * 0.5 }} />
-              <div className="core-inner">
-                {isSpeaking ? <Volume2 size={40} /> : <Mic size={40} />}
+              {/* Sürekli dönen ve şekil değiştiren organik katmanlar */}
+              <div className="blob blob-1"></div>
+              <div className="blob blob-2"></div>
+              <div className="blob blob-3"></div>
+              
+              {/* Merkezdeki İkon */}
+              <div className="core-icon">
+                {isProcessing ? <Activity size={40} className="spin" /> : 
+                 isSpeaking ? <Volume2 size={40} /> : 
+                 <Mic size={40} />}
               </div>
-            </button>
+            </div>
 
             {isSpeaking && (
               <button className="stop-btn" onClick={stopSpeaking} style={{ marginTop: '120px' }}>
@@ -450,7 +436,7 @@ KURALLAR:
             <div className="status" style={{ marginTop: '140px' }}>
               <div className={`status-dot ${isListening ? 'active' : ''} ${isSpeaking ? 'speaking' : ''}`} />
               <span>
-                {isProcessing ? 'DÜŞÜNÜYOR...' : isListening ? 'DİNLİYOR...' : isSpeaking ? 'KONUŞUYOR...' : 'HAZIR'}
+                {isProcessing ? 'SİSTEM DÜŞÜNÜYOR...' : isListening ? 'SİSTEM DİNLİYOR...' : isSpeaking ? 'SİSTEM KONUŞUYOR...' : 'SİSTEM HAZIR'}
               </span>
             </div>
           </div>
