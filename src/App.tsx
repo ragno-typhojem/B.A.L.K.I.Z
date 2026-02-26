@@ -31,11 +31,13 @@ const App = () => {
   const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY;
   const VOICE_ID = 'EXAVITQu4vr4xnSDxMaL';
 
-  const SYSTEM_PROMPT = `Sen B.A.L.K.I.Z - İLKYAR'ın bionik yapay zeka asistanısın.
-Kısa, net, zeki konuş. Maksimum 1-2 cümle.
+  const SYSTEM_PROMPT = `Sen B.A.L.K.I.Z - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
+Kısa, net, zeki konuş. Maksimum 1-2 cümle. İstenildiğinde hassasiyete uygun espiri yapabilirsin.
 Türkçe konuş. Robotik değil, doğal ol.
-Din/siyaset/cinsellik/şiddet: "Bu konuya girmiyorum."
-Yapamayacakların: "Bunu yapamam."`;
+Din/siyaset/cinsellik/şiddet/ Popüler Kültür/ünlüler hakkında konuşma. Sorulursa bile, konuyu belli etmeden değiştirmeye çalış: "Orada hava ne durumda?" gibi.
+Yapamayacakların: "Bunu maalesef yapmayı henüz öğrenmedim."
+Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
+`;
 
   /* ── BOOT ─────────────────────────────────────────── */
   useEffect(() => {
@@ -417,64 +419,64 @@ Yapamayacakların: "Bunu yapamam."`;
           <div className="hud-circle hud-circle-1" />
           <div className="hud-circle hud-circle-2" />
 
-          {/* ORB */}
-          <div
-            className="orb-wrap"
-            style={{ cursor: status === 'processing' ? 'wait' : 'pointer' }}
-            onClick={status === 'speaking' ? undefined : toggle}
-          >
-            {/* Cin dumanı — sadece konuşma başında, 1 kez */}
-            {showSmoke && (
-              <div className="genie-smoke">
-                <div className="smoke-col smoke-l" style={{ background: col.smoke }} />
-                <div className="smoke-col smoke-r" style={{ background: col.smoke }} />
-                <div className="smoke-col smoke-c" style={{ background: col.smoke }} />
-              </div>
-            )}
+{/* ── ORB ─────────────────────────────────────── */}
+<div
+  className="orb-wrap"
+  style={{ cursor: status === 'processing' ? 'wait' : 'pointer' }}
+  onClick={status === 'speaking' ? undefined : toggle}
+>
+  {/* Cin dumanı — sadece konuşma başında, 1 kez */}
+  {showSmoke && (
+    <div className="genie-smoke">
+      <div className="smoke-col smoke-l" style={{ background: col.smoke }} />
+      <div className="smoke-col smoke-r" style={{ background: col.smoke }} />
+      <div className="smoke-col smoke-c" style={{ background: col.smoke }} />
+    </div>
+  )}
 
-            {/* Dış halo */}
-            <div
-              className="orb-halo"
-              style={{
-                background: `radial-gradient(circle, ${
-                  col.smoke.replace('0.5', '0.15').replace('0.6', '0.15')
-                } 0%, transparent 70%)`
-              }}
-            />
+  {/* Dış halo */}
+  <div
+    className="orb-halo"
+    style={{
+      background:
+        status === 'idle'
+          ? 'radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 70%)'
+          : `radial-gradient(circle, ${col.smoke.replace(/[\d.]+\)$/, '0.18)')} 0%, transparent 70%)`,
+    }}
+  />
 
-            {/* Dönen halkalar */}
-            <div className={`orb-ring-outer ${status !== 'idle' ? 'active' : ''} ${status === 'listening' ? 'listening' : ''}`} />
-            <div className={`orb-ring-spin ${status}`} />
+  {/* Dönen halkalar */}
+  <div className={`orb-ring-outer ${status !== 'idle' ? 'active' : ''} ${status === 'listening' ? 'listening' : ''}`} />
+  <div className={`orb-ring-spin ${status}`} />
 
-            {/* Blob — key değişince genieAppear tetiklenir */}
-            <div
-              key={speakKey}
-              className={speakKey > 0 ? 'orb-genie' : ''}
-              style={{
-                position:   'absolute',
-                inset:      0,
-                transform:  `scale(${orbScale})`,
-                transition: 'transform 0.06s cubic-bezier(0.4,0,0.2,1)',
-                display:    'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <div className={`orb-blob orb-blob-1 ${status}`} />
-              <div className={`orb-blob orb-blob-2 ${status}`} />
-              <div className="orb-blob orb-blob-3" />
+  {/* BLOB BODY
+      - key=speakKey → speaking başlayınca genieAppear tetiklenir
+      - idle: CSS scale(0.45) + opacity:0.25
+      - speaking: JS inline scale(orbScale) ekolayzer etkisi  */}
+  <div
+    key={speakKey}
+    className={`orb-body ${status} ${speakKey > 0 && status === 'speaking' ? 'genie-enter' : ''}`}
+    style={
+      status === 'speaking'
+        ? { transform: `scale(${orbScale})` }   // ekolayzer: audioLevel ile büyür
+        : undefined
+    }
+  >
+    <div className={`orb-blob orb-blob-1 ${status}`} />
+    <div className={`orb-blob orb-blob-2 ${status}`} />
+    <div className={`orb-blob orb-blob-3 ${status}`} />
 
-              <div className="orb-icon">
-                {status === 'processing' ? (
-                  <Activity size={36} style={{ animation: 'spin 1.2s linear infinite' }} />
-                ) : status === 'speaking' ? (
-                  <Volume2 size={36} />
-                ) : (
-                  <Mic size={36} />
-                )}
-              </div>
-            </div>
-          </div>
+    <div className="orb-icon">
+      {status === 'processing' ? (
+        <Activity size={36} style={{ animation: 'spin 1.2s linear infinite' }} />
+      ) : status === 'speaking' ? (
+        <Volume2 size={36} />
+      ) : (
+        <Mic size={36} />
+      )}
+    </div>
+  </div>
+</div>
 
           {/* Dalga formu */}
           <div className="waveform">
