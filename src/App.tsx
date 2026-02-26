@@ -338,11 +338,6 @@ Senin özelliklerin konuşmak ile kısıtlı, o yüzden yapamayacağın şeyleri
     }
   };
 
-  // ... ParticleAnimation bileşeni aynı kalıyor ...
-  const ParticleAnimation = () => {
-    // ... (Kod kalabalığı yapmamak için burayı atlamadım, kopyalarken orijinal dosyanla değiştirebilirsin) ...
-    return <svg className="particle-animation" viewBox="0 0 400 400"></svg>; // Örnek
-  };
 
   if (showBootScreen) {
     return (
