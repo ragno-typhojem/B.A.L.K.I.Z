@@ -31,7 +31,7 @@ const App = () => {
   const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY;
   const VOICE_ID = 'EXAVITQu4vr4xnSDxMaL';
 
-  const SYSTEM_PROMPT = `Sen B.A.L.K.I.Z - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
+  const SYSTEM_PROMPT = `İsmin: "BALKIZ" - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
 Kısa, net, zeki konuş. Maksimum 1-2 cümle. İstenildiğinde hassasiyete uygun espiri yapabilirsin.
 Türkçe konuş. Robotik değil, doğal ol.
 Din/siyaset/cinsellik/şiddet/ Popüler Kültür/ünlüler hakkında konuşma. Sorulursa bile, konuyu belli etmeden değiştirmeye çalış: "Orada hava ne durumda?" gibi.
@@ -315,13 +315,13 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
           <div className="hud-header-left">
             <span className="hud-logo-text">B.A.L.K.I.Z</span>
             <div className="hud-divider" />
-            <span className="hud-sub-text">BİONİK YAPAY ZEKA · vEarly.1</span>
+            <span className="hud-sub-text">BİONİK YAPAY ZEKA · v2</span>
           </div>
 
           <div className="hud-header-center">
             {[
-              { label: 'MODEL',  val: 'LLAMA 3.3 70B'                   },
-              { label: 'SES',    val: 'EL TURBO'                        },
+              { label: 'MODEL',  val: '3.3 70B Parametre'                   },
+              { label: 'SES',    val: 'SES1'                        },
               { label: 'HAFIZA', val: `${(chatHistory.length / 2) | 0} / 8` },
             ].map(s => (
               <div key={s.label} className="hud-stat">
