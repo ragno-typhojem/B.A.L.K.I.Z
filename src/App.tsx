@@ -76,7 +76,9 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
     const msgs = [
       'Sistem devrede. Nasıl yardımcı olabilirim?',
       'Hazırım. Ne yapıyoruz?',
-      'Seni dinliyorum.'
+      'Seni dinliyorum.',
+      'Ben geldim. Nasılsın?'
+      
     ];
     const g = msgs[Math.floor(Math.random() * msgs.length)];
     setResponse(g);
@@ -606,14 +608,15 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
         {/* ── FOOTER ──────────────────────────────────── */}
         <footer className="hud-footer">
           <span className="footer-text">
-            GROQ WHISPER-LARGE-V3 · LLAMA-3.3-70B · ELEVENLABS TURBO V2.5
+            balkiz yanıtlarını araştır, sorgula, geliştir. geri bildirimlerinle bu yapay zekayı daha iyi hale getirebilirsin. iletişim: <a href="mailto:simseklermustafaberke@gmail.com"/>
+
           </span>
           <div className="footer-dots">
             <div className={`footer-dot ${status !== 'idle' ? 'on' : ''}`} />
             <div className={`footer-dot ${status === 'speaking' || status === 'processing' ? 'on' : ''}`} />
             <div className={`footer-dot ${status === 'speaking' ? 'on' : ''}`} />
           </div>
-          <span className="footer-text">İLKYAR © 2025</span>
+          <span className="footer-text">Mustafa Berke Şimşekler © 2025</span>
         </footer>
 
       </div>
