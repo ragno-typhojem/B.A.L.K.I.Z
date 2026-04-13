@@ -223,16 +223,21 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
     setTimeout(() => setShowSmoke(false), 1400);
     startViz();
     try {
-      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'xi-api-key': EL_KEY },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_turbo_v2_5',
-          language_code: 'tr',
-          voice_settings: { stability: 0.8, similarity_boost: 0.85, style: 0.2, use_speaker_boost: true }
-        })
-      });
+const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`, {
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json', 
+    'xi-api-key': EL_KEY 
+  },
+  body: JSON.stringify({
+    text,
+    model_id: 'eleven_multilingual_v2', // Türkçe için en stabil model budur
+    voice_settings: { 
+      stability: 0.7, 
+      similarity_boost: 0.8 
+    }
+  })
+});
       if (!r.ok) throw new Error(`${r.status}`);
       const blob = await r.blob();
       const url  = URL.createObjectURL(blob);
