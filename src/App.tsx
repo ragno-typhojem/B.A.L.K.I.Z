@@ -29,7 +29,7 @@ const App = () => {
 
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY;
-  const VOICE_ID = 'mBUB5zYuPwfVE6DTcEjf';
+  const VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
 
   const SYSTEM_PROMPT = `İsmin: "BALKIZ" - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
 Kısa, net, zeki konuş. Maksimum 1-2 cümle. İstenildiğinde hassasiyete uygun espiri yapabilirsin.
@@ -230,7 +230,7 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
           text,
           model_id: 'eleven_turbo_v2_5',
           language_code: 'tr',
-          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.2, use_speaker_boost: true }
+          voice_settings: { stability: 0.8, similarity_boost: 0.85, style: 0.2, use_speaker_boost: true }
         })
       });
       if (!r.ok) throw new Error(`${r.status}`);
