@@ -29,7 +29,7 @@ const App = () => {
 
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY;
-  const VOICE_ID = 'EXAVITQu4vr4xnSDxMaL';
+  const VOICE_ID = 'mBUB5zYuPwfVE6DTcEjf';
 
   const SYSTEM_PROMPT = `İsmin: "BALKIZ" - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
 Kısa, net, zeki konuş. Maksimum 1-2 cümle. İstenildiğinde hassasiyete uygun espiri yapabilirsin.
