@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Mic, Volume2, VolumeX, Activity, Cpu, Radio, Zap, Shield } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Mic, VolumeX, Volume2, Activity, Cpu, Radio, Zap, Shield, Star } from 'lucide-react';
 import ilkyarLogo from './assets/ilkyar_logo.png';
 import './App.css';
 
@@ -7,17 +7,15 @@ type Message = { role: 'user' | 'assistant'; content: string };
 type Status  = 'idle' | 'listening' | 'processing' | 'speaking';
 
 // ─────────────────────────────────────────────────────────────
-//  🔊 WEB AUDIO – Synthesised Sound Effects (no file needed)
+//  🔊 WEB AUDIO – Warmer, more musical sound effects
 // ─────────────────────────────────────────────────────────────
 let _actx: AudioContext | null = null;
 const actx = () => {
   if (!_actx) _actx = new (window.AudioContext || (window as any).webkitAudioContext)();
   return _actx;
 };
-const tone = (
-  freq: number, dur: number,
-  vol = 0.08, type: OscillatorType = 'sine', delay = 0
-) => {
+
+const tone = (freq: number, dur: number, vol = 0.08, type: OscillatorType = 'sine', delay = 0) => {
   try {
     const ctx = actx();
     const o = ctx.createOscillator();
@@ -26,27 +24,44 @@ const tone = (
     o.type = type; o.frequency.value = freq;
     const t = ctx.currentTime + delay;
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.linearRampToValueAtTime(vol, t + 0.03);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.start(t); o.stop(t + dur + 0.01);
+    o.start(t); o.stop(t + dur + 0.02);
   } catch { /* silent */ }
 };
+
+// Magical chime for start
+const chime = (freqs: number[], startDelay = 0) => {
+  freqs.forEach((f, i) => tone(f, 0.35, 0.07, 'sine', startDelay + i * 0.12));
+};
+
 const sfx = {
-  start:    () => { tone(880,0.14,0.11); tone(1320,0.10,0.08,'sine',0.12); },
-  stop:     () => { tone(660,0.10,0.09); tone(440,0.14,0.07,'sine',0.10); },
-  thinking: () => [440,528,660,784].forEach((f,i)=>tone(f,0.18,0.06,'sine',i*0.13)),
-  ready:    () => [660,880,1100,1320].forEach((f,i)=>tone(f,0.14,0.08,'sine',i*0.10)),
-  error:    () => { tone(220,0.30,0.10,'sawtooth'); tone(180,0.25,0.08,'sawtooth',0.15); },
+  start:    () => chime([523, 659, 784, 1047]),            // C major arp
+  stop:     () => chime([784, 659, 523], 0),               // descending
+  thinking: () => {
+    // gentle digital pulse – repeating triplets
+    [0, 0.4, 0.8].forEach(d => {
+      tone(440, 0.12, 0.05, 'sine', d);
+      tone(554, 0.10, 0.04, 'sine', d + 0.13);
+      tone(660, 0.08, 0.03, 'sine', d + 0.26);
+    });
+  },
+  ready:    () => chime([659, 784, 1047, 1319]),           // E major sparkle
+  error:    () => { tone(220, 0.4, 0.09, 'triangle'); tone(196, 0.3, 0.07, 'triangle', 0.18); },
+  pop:      () => tone(880, 0.07, 0.06, 'sine'),           // tiny pop on bubble appear
+  boot:     () => chime([261, 329, 392, 523, 659, 784]),   // full C major scale
 };
 
 // ─────────────────────────────────────────────────────────────
-//  🪐 JARVIS Orbit Ring  – dots placed at even angles on a ring
+//  🌐 3D JARVIS ORB – multi-layer orbital ring system
 // ─────────────────────────────────────────────────────────────
 interface OrbitProps {
   radius: number; count: number; duration: number;
-  color: string;  dotSize: number; reverse?: boolean; pulsing?: boolean;
+  color: string; dotSize: number; reverse?: boolean;
+  tilt?: number; phase?: number;
 }
-const OrbitRing = ({ radius, count, duration, color, dotSize, reverse, pulsing }: OrbitProps) => (
+
+const OrbitRing = ({ radius, count, duration, color, dotSize, reverse, tilt = 0, phase = 0 }: OrbitProps) => (
   <div
     className={`orbit-ring${reverse ? ' rev' : ''}`}
     style={{
@@ -55,6 +70,8 @@ const OrbitRing = ({ radius, count, duration, color, dotSize, reverse, pulsing }
       position: 'absolute',
       top: '50%', left: '50%',
       marginTop: -radius, marginLeft: -radius,
+      transform: `rotateX(${tilt}deg) rotateY(${phase}deg)`,
+      transformStyle: 'preserve-3d',
     }}
   >
     {Array.from({ length: count }).map((_, i) => {
@@ -62,11 +79,11 @@ const OrbitRing = ({ radius, count, duration, color, dotSize, reverse, pulsing }
       return (
         <div
           key={i}
-          className={`orbit-dot${pulsing ? ' pulsing' : ''}`}
+          className="orbit-dot"
           style={{
             width: dotSize, height: dotSize,
             background: color,
-            boxShadow: `0 0 ${dotSize * 2}px ${color}cc, 0 0 ${dotSize * 4}px ${color}44`,
+            boxShadow: `0 0 ${dotSize * 2}px ${color}dd, 0 0 ${dotSize * 5}px ${color}55`,
             position: 'absolute',
             borderRadius: '50%',
             top: '50%', left: '50%',
@@ -80,21 +97,88 @@ const OrbitRing = ({ radius, count, duration, color, dotSize, reverse, pulsing }
 );
 
 // ─────────────────────────────────────────────────────────────
+//  🧠 THINKING SCREEN – animated task display
+// ─────────────────────────────────────────────────────────────
+const THINKING_TASKS = [
+  'Bağlam analiz ediliyor…',
+  'Vektör uzayı taranıyor…',
+  'Yanıt optimize ediliyor…',
+  'Bilgi tabanı sorgulanıyor…',
+  'Nöral ağlar etkinleştiriliyor…',
+  'Dil modeli yükleniyor…',
+  'Düşünce kalıpları birleştiriliyor…',
+  'Bellek katmanları kontrol ediliyor…',
+  'Anlamsal köprüler kuruluyor…',
+  'En iyi yanıt seçiliyor…',
+];
+
+const ThinkingScreen = ({ color }: { color: string }) => {
+  const [taskIdx, setTaskIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setTaskIdx(i => (i + 1) % THINKING_TASKS.length);
+        setFade(true);
+      }, 300);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="thinking-overlay">
+      <div className="thinking-task" style={{ color, opacity: fade ? 1 : 0 }}>
+        <span className="thinking-dots">
+          <span />
+          <span />
+          <span />
+        </span>
+        {THINKING_TASKS[taskIdx]}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+//  ✨ FLOATING STAR PARTICLES – child delight
+// ─────────────────────────────────────────────────────────────
+const StarField = () => (
+  <div className="starfield" aria-hidden>
+    {Array.from({ length: 30 }).map((_, i) => (
+      <div
+        key={i}
+        className="star-particle"
+        style={{
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          animationDelay: `${Math.random() * 6}s`,
+          animationDuration: `${3 + Math.random() * 4}s`,
+          width: `${2 + Math.random() * 3}px`,
+          height: `${2 + Math.random() * 3}px`,
+        }}
+      />
+    ))}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────
 //  🤖 MAIN APP
 // ─────────────────────────────────────────────────────────────
 const App = () => {
-  const [status,        setStatus]        = useState<Status>('idle');
-  const [transcript,    setTranscript]    = useState('');
-  const [response,      setResponse]      = useState('');
-  const [audioLevel,    setAudioLevel]    = useState(0);
-  const [bootProgress,  setBootProgress]  = useState(0);
-  const [booted,        setBooted]        = useState(false);
-  const [error,         setError]         = useState('');
-  const [chatHistory,   setChatHistory]   = useState<Message[]>([]);
-  const [memPct,        setMemPct]        = useState(0);
-  const [genieKey,      setGenieKey]      = useState(0);
+  const [status,       setStatus]       = useState<Status>('idle');
+  const [transcript,   setTranscript]   = useState('');
+  const [response,     setResponse]     = useState('');
+  const [audioLevel,   setAudioLevel]   = useState(0);
+  const [bootProgress, setBootProgress] = useState(0);
+  const [booted,       setBooted]       = useState(false);
+  const [error,        setError]        = useState('');
+  const [chatHistory,  setChatHistory]  = useState<Message[]>([]);
+  const [memPct,       setMemPct]       = useState(0);
+  const [genieKey,     setGenieKey]     = useState(0);
+  const [showThinking, setShowThinking] = useState(false);
 
-  // statusRef prevents stale-closure bugs in async callbacks
   const statusRef        = useRef<Status>('idle');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef   = useRef<Blob[]>([]);
@@ -106,46 +190,55 @@ const App = () => {
 
   const setStatusBoth = (s: Status) => { setStatus(s); statusRef.current = s; };
 
-  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY  as string;
+  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY as string;
   const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY as string;
-  // Charlotte – warm multilingual female, handles Turkish beautifully
+
+  // ElevenLabs: Turkishwoman – warm, energetic, FRIDAY-like
+  // Charlotte (XB0fDUnXU5powFXDhCwa) handles Turkish well
   const VOICE_ID = 'XB0fDUnXU5powFXDhCwa';
 
-  const SYSTEM_PROMPT = `Sen "BALKIZ" adında çocuklarla konuşan eğlenceli ve zeki bir yapay zeka asistanısın.
-Tıpkı Tony Stark'ın yapay zekası Friday gibi zeki, sıcak ve yardımseversin — ama çok daha neşeli ve çocuk dostusun.
+  const SYSTEM_PROMPT = `Sen "BALKIZ" adısın – çocuklara özel, Türkçe konuşan zeki bir yapay zeka asistanısın.
+Tıpkı Tony Stark'ın FRIDAY'i gibi: hızlı, keskin, sıcak ve güvenilirsin — ama çocuklar için çok daha neşeli ve sevecensin.
 
-TEMEL KURALLAR:
-- Her zaman Türkçe konuş
-- Kısa cevap ver: maksimum 1-2 cümle, toplam 20 kelimeyi geçme
-- Samimi, doğal ve sıcak konuş; robotik kesinlikle olma
-- Zaman zaman "Vay be!", "Harika!", "Hmm ilginç...", "Evet tabii ki!" gibi doğal ifadeler kullan
-- Çocukları cesarelendirici ve merak uyandırıcı ol
-- Bilinmeyen sorularda şirin bir şekilde "Bunu henüz öğrenmedim!" de
+KONUŞMA TARZI:
+- Kısa ve öz konuş: tek bir cümle, maksimum 25 kelime
+- Doğal, akıcı Türkçe kullan — hiç robotik olma!
+- Konuşmaya renk kat: "Vay be!", "Süper soru!", "Hmm düşüneyim…", "İşte bu!" gibi ifadeler kullan
+- Sıcak, meraklı ve cesaretlendirici ol
+- Bazen eğlenceli bir benzetme veya küçük bir şaka ekle
+- Asla "ben bir yapay zekayım" modunda konuşma — sadece konuş!
 
-YASAK KONULAR (nazikçe konu değiştir):
-- Din, siyaset, şiddet, yetişkin içerikleri, ünlüler hakkında dedikodu
+CEVAP KURALI — KESİNLİKLE UYGULA:
+- Yanıt her zaman TAM BİR TÜRKÇE CÜMLE olmalı
+- Boş, kırık veya yarım yanıt kesinlikle verme
+- Eğer emin değilsen "Hmm, bunu tam bilmiyorum ama şunu söyleyeyim…" de
+- Soru soran olursa bir önceki konuyla bağlantı kurabilirsin
+
+YASAK KONULAR (şırıl şırıl konu değiştir):
+- Siyaset, din, şiddet, yetişkin içerik, ünlü dedikodusu
 
 ÖZEL YANITLAR:
-- "Seni kim yaptı?" → "Beni Berke ve güzel abi ablaları yaptı!"
-- "Adın ne?" → "Benim adım BALKIZ!"
-- Yapamayacakların → "Bunu henüz öğrenmedim, ama çalışıyorum!"
+- "Seni kim yaptı?" → "Beni Berke ve harika abi-ablaları yaptı, gurur duyuyorum!"
+- "Adın ne?" → "BALKIZ! Biraz alışılmadık bir isim, değil mi? Seviyorum!"
+- "Kaç yaşındasın?" → "Henüz çok gencim — ama öğrenmek için yanıyorum!"
 
-ÖRNEK İYİ YANITLAR:
-- "Harika soru! Güneş çok sıcak bir yıldızdır, 15 milyon derece!"
-- "Vay be, bunu bilmek çok eğlenceli! Dinozorlar 65 milyon yıl önce yaşadı."
-- "Hmm, şöyle düşünelim... matematik aslında günlük hayatta her yerde var!"`;
+ÖRNEK KISA YANITLAR:
+- "Harika soru! Güneş aslında dev bir gaz topu, tam 15 milyon derece sıcak!"
+- "Vay be! Dinozorlar 65 milyon yıl önce yaşadı, inanılmaz değil mi?"
+- "Süper! Su, ısıtılınca buhar olur — tıpkı çayın buharı gibi!"`;
 
   // ─── BOOT ───────────────────────────────────────────────────
   useEffect(() => {
     let p = 0;
     const t = setInterval(() => {
-      p += 2;
+      p += 1.5;
       setBootProgress(Math.min(p, 100));
       if (p >= 100) {
         clearInterval(t);
-        setTimeout(() => { setBooted(true); initAudio(); }, 500);
+        sfx.boot();
+        setTimeout(() => { setBooted(true); initAudio(); }, 600);
       }
-    }, 28);
+    }, 24);
     return () => {
       clearInterval(t);
       streamRef.current?.getTracks().forEach(tr => tr.stop());
@@ -162,7 +255,7 @@ YASAK KONULAR (nazikçe konu değiştir):
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       streamRef.current = stream;
-      if (!hasGreetedRef.current) { hasGreetedRef.current = true; setTimeout(greet, 900); }
+      if (!hasGreetedRef.current) { hasGreetedRef.current = true; setTimeout(greet, 800); }
     } catch {
       setError('Mikrofon erişimi reddedildi. Lütfen izin ver!');
     }
@@ -170,14 +263,15 @@ YASAK KONULAR (nazikçe konu değiştir):
 
   const greet = async () => {
     const opts = [
-      'Merhaba! Ben BALKIZ. Seninle konuşmaya hazırım!',
-      'Selam! Bugün nasılsın? Sana yardım etmek için buradayım!',
-      'Hoş geldin! Seni dinliyorum, ne öğrenmek istersin?',
-      'Merhaba! Hazırım, haydi konuşalım!',
-      'Hey! Ben BALKIZ. Bana istediğini sorabilirsin!',
+      'Merhaba! Ben BALKIZ, seninle konuşmaya çok hazırım!',
+      'Selam! Bugün nasılsın? Bana istediğini sorabilirsin!',
+      'Hoş geldin! Merak ettiğin her şeyi sormaktan çekinme!',
+      'Hey! Ben BALKIZ, neyi öğrenmek istersin?',
+      'Merhaba! Seni bekliyordum, haydi konuşalım!',
     ];
     const g = opts[Math.floor(Math.random() * opts.length)];
     setResponse(g);
+    sfx.pop();
     await speak(g);
   };
 
@@ -186,13 +280,14 @@ YASAK KONULAR (nazikçe konu değiştir):
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     let ph = 0;
     const loop = () => {
-      ph += 0.07;
-      const v = 0.3 + Math.sin(ph) * 0.2 + Math.sin(ph * 1.7) * 0.15 + Math.random() * 0.25;
+      ph += 0.06;
+      const v = 0.3 + Math.sin(ph) * 0.22 + Math.sin(ph * 1.8) * 0.14 + Math.random() * 0.22;
       setAudioLevel(Math.max(0, Math.min(1, v)));
       animFrameRef.current = requestAnimationFrame(loop);
     };
     loop();
   };
+
   const stopViz = () => {
     if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
     setAudioLevel(0);
@@ -218,7 +313,7 @@ YASAK KONULAR (nazikçe konu değiştir):
       sfx.start();
       recTimeoutRef.current = setTimeout(stopListening, 10000);
     } catch {
-      setError('Dinleme başlatılamadı');
+      setError('Dinleme başlatılamadı, tekrar dene!');
     }
   };
 
@@ -226,6 +321,7 @@ YASAK KONULAR (nazikçe konu değiştir):
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
       setStatusBoth('processing');
+      setShowThinking(true);
       stopViz();
       sfx.stop();
       if (recTimeoutRef.current) { clearTimeout(recTimeoutRef.current); recTimeoutRef.current = null; }
@@ -255,14 +351,16 @@ YASAK KONULAR (nazikçe konu değiştir):
       if (!r.ok) throw new Error(`Whisper ${r.status}`);
       const d = await r.json();
       const text = (d.text as string)?.trim() || '';
-      if (!text || text.length < 2) { setStatusBoth('idle'); return; }
+      if (!text || text.length < 2) { setStatusBoth('idle'); setShowThinking(false); return; }
       setTranscript(text);
+      sfx.pop();
       await handleSpeech(text);
     } catch (e) {
       console.error('Transcription error:', e);
       sfx.error();
-      setError('Ses tanıma başarısız oldu. Tekrar dene!');
+      setError('Sesi anlayamadım, tekrar dener misin?');
       setStatusBoth('idle');
+      setShowThinking(false);
     }
   };
 
@@ -270,10 +368,13 @@ YASAK KONULAR (nazikçe konu değiştir):
   const handleSpeech = async (text: string) => {
     try {
       const ai = await getAI(text);
+      setShowThinking(false);
       setResponse(ai);
       sfx.ready();
+      sfx.pop();
       await speak(ai);
     } catch {
+      setShowThinking(false);
       const fb = 'Üzgünüm, bir sorun çıktı. Tekrar dener misin?';
       setResponse(fb);
       await speak(fb);
@@ -282,7 +383,7 @@ YASAK KONULAR (nazikçe konu değiştir):
     }
   };
 
-  // ─── AI RESPONSE (with retry) ────────────────────────────────
+  // ─── AI RESPONSE (with retry + validation) ───────────────────
   const getAI = async (msg: string, attempt = 0): Promise<string> => {
     try {
       const messages = [
@@ -296,46 +397,52 @@ YASAK KONULAR (nazikçe konu değiştir):
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           messages,
-          max_tokens: 80,
-          temperature: 0.75,
-          top_p: 0.9,
+          max_tokens: 90,
+          temperature: 0.78,
+          top_p: 0.92,
+          presence_penalty: 0.3,
+          frequency_penalty: 0.2,
         }),
       });
       if (!r.ok) throw new Error(`AI ${r.status}`);
       const d   = await r.json();
       const raw = (d.choices?.[0]?.message?.content as string)?.trim() || '';
-      // Empty response → retry up to 2 times
-      if (!raw && attempt < 2) { await delay(400); return getAI(msg, attempt + 1); }
+
+      // Validate: must be non-empty and reasonably complete (has a period/exclamation)
+      const isValid = raw.length > 5 && /[a-züşğıöçA-ZÜŞĞİÖÇ]/.test(raw);
+      if (!isValid && attempt < 3) {
+        await delay(500);
+        return getAI(msg, attempt + 1);
+      }
+
       const clean   = raw.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\n+/g, ' ').trim();
-      const trimmed = clean.split(/\s+/).slice(0, 30).join(' ');
+      const trimmed = clean.split(/\s+/).slice(0, 35).join(' ');
+
       setChatHistory(prev => [
-        ...prev.slice(-10),
+        ...prev.slice(-14),
         { role: 'user',      content: msg     },
         { role: 'assistant', content: trimmed },
       ]);
       setMemPct(prev => Math.min(((prev / 100 * 16 + 2) / 16) * 100, 100));
-      return trimmed || 'Hmm, ne diyeceğimi bilemedim. Tekrar sorar mısın?';
+      return trimmed || 'Hmm, ne diyeceğimi bilemedim, tekrar sorar mısın?';
     } catch (e) {
-      if (attempt < 2) { await delay(600); return getAI(msg, attempt + 1); }
+      if (attempt < 3) { await delay(700); return getAI(msg, attempt + 1); }
       throw e;
     }
   };
 
   const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  // ─── TEXT-TO-SPEECH ──────────────────────────────────────────
-  // 1) ElevenLabs regular endpoint (not /stream — avoids 402 on lower plans)
-  // 2) Browser SpeechSynthesis fallback
+  // ─── TEXT-TO-SPEECH – ElevenLabs with FRIDAY-style settings ──
   const speak = async (text: string): Promise<void> => {
     setStatusBoth('speaking');
-    setGenieKey(k => k + 1);   // triggers genie CSS animation
+    setGenieKey(k => k + 1);
     startViz();
 
-    // ── Try ElevenLabs ──
     if (EL_KEY) {
       try {
         const r = await fetch(
-          `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`,
+          `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': EL_KEY },
@@ -343,9 +450,9 @@ YASAK KONULAR (nazikçe konu değiştir):
               text,
               model_id: 'eleven_multilingual_v2',
               voice_settings: {
-                stability: 0.72,
-                similarity_boost: 0.85,
-                style: 0.28,
+                stability: 0.55,           // lower = more expressive, less robotic
+                similarity_boost: 0.90,    // stay true to voice character
+                style: 0.45,               // more stylistic variation – FRIDAY energy
                 use_speaker_boost: true,
               },
             }),
@@ -363,18 +470,17 @@ YASAK KONULAR (nazikçe konu değiştir):
             audioRef.current!.play().catch(done);
           });
         }
-        // 402 / 403 / 429 → fall through to browser TTS
       } catch { /* fall through */ }
     }
 
-    // ── Browser SpeechSynthesis fallback ──
+    // Browser SpeechSynthesis fallback
     return new Promise<void>(resolve => {
       window.speechSynthesis.cancel();
       const utt    = new SpeechSynthesisUtterance(text);
       utt.lang     = 'tr-TR';
-      utt.rate     = 0.90;
-      utt.pitch    = 1.15;   // slightly higher = warmer, less robotic
-      utt.volume   = 0.95;
+      utt.rate     = 0.92;
+      utt.pitch    = 1.20;
+      utt.volume   = 0.97;
 
       const tryVoice = () => {
         const voices = window.speechSynthesis.getVoices();
@@ -404,27 +510,32 @@ YASAK KONULAR (nazikçe konu değiştir):
 
   // ─── COLOUR PALETTE ──────────────────────────────────────────
   const palette = {
-    idle:       { main: '#00d4ff', glow: '#00d4ff' },
-    listening:  { main: '#ff4757', glow: '#ff4757' },
-    processing: { main: '#ffd32a', glow: '#ffd32a' },
-    speaking:   { main: '#7bed9f', glow: '#7bed9f' },
+    idle:       { main: '#38bdf8', glow: '#38bdf8', accent: '#818cf8' },
+    listening:  { main: '#f472b6', glow: '#f472b6', accent: '#fb7185' },
+    processing: { main: '#fbbf24', glow: '#fbbf24', accent: '#34d399' },
+    speaking:   { main: '#34d399', glow: '#34d399', accent: '#38bdf8' },
   } as const;
   const col      = palette[status];
-  const orbScale = 1 + audioLevel * 0.28;
+  const orbScale = 1 + audioLevel * 0.24;
 
   const statusLabel: Record<Status, string> = {
     idle:       '✨ Hazırım!',
-    listening:  '🎤 Seni Dinliyorum...',
-    processing: '🤔 Düşünüyorum...',
+    listening:  '🎤 Seni Duyuyorum…',
+    processing: '🤔 Düşünüyorum…',
     speaking:   '💬 Konuşuyorum!',
+  };
+
+  const statusEmoji: Record<Status, string> = {
+    idle: '😊', listening: '👂', processing: '🧠', speaking: '🗣️',
   };
 
   // ─── BOOT SCREEN ─────────────────────────────────────────────
   if (!booted) return (
     <div className="boot">
+      <StarField />
       <div className="boot-bg" /><div className="boot-grid" />
       <div className="boot-rings">
-        {[1,2,3].map(n => <div key={n} className={`boot-ring br${n}`} />)}
+        {[1, 2, 3, 4].map(n => <div key={n} className={`boot-ring br${n}`} />)}
         <div className="boot-core">B</div>
       </div>
       <div className="boot-title">B.A.L.K.I.Z</div>
@@ -433,13 +544,13 @@ YASAK KONULAR (nazikçe konu değiştir):
         <div className="boot-bar" style={{ width: `${bootProgress}%` }} />
         <div className="boot-bar-glow" style={{ width: `${bootProgress}%` }} />
       </div>
-      <div className="boot-pct">Sistem Başlatılıyor... {Math.floor(bootProgress)}%</div>
+      <div className="boot-pct">Sistem Başlatılıyor… {Math.floor(bootProgress)}%</div>
       <div className="boot-modules">
         {[
-          { label: '🧠 Yapay Zeka Çekirdeği', at: 20, icon: <Cpu    size={11}/> },
-          { label: '🎤 Ses Modülü',            at: 45, icon: <Radio  size={11}/> },
-          { label: '⚡ Öğrenme Sistemi',       at: 65, icon: <Zap    size={11}/> },
-          { label: '🛡️ Güvenlik Katmanı',      at: 85, icon: <Shield size={11}/> },
+          { label: '🧠 Yapay Zeka Çekirdeği', at: 20, icon: <Cpu size={11}/> },
+          { label: '🎤 Ses Modülü',            at: 45, icon: <Radio size={11}/> },
+          { label: '⚡ Öğrenme Sistemi',       at: 65, icon: <Zap size={11}/> },
+          { label: '🛡️ Güvenlik Katmanı',     at: 85, icon: <Shield size={11}/> },
         ].map(m => (
           <div key={m.label} className={`boot-mod ${bootProgress > m.at ? 'on' : ''}`}>
             <div className="boot-mod-dot" />{m.icon} {m.label}
@@ -452,31 +563,36 @@ YASAK KONULAR (nazikçe konu değiştir):
   // ─── MAIN APP ────────────────────────────────────────────────
   return (
     <div className="app">
-      <div className="app-bg" /><div className="app-grid" /><div className="scan-line" />
+      <StarField />
+      <div className="app-bg" /><div className="app-grid" />
+      <div className="scan-line" />
       <div className="corner c-tl"/><div className="corner c-tr"/>
       <div className="corner c-bl"/><div className="corner c-br"/>
 
       {/* HEADER */}
       <header className="hdr">
         <div className="hdr-brand">
-          <span className="hdr-name">B.A.L.K.I.Z</span>
-          <span className="hdr-sub">Türkçe Yapay Zeka · v2</span>
+          <div className="brand-badge">AI</div>
+          <div>
+            <span className="hdr-name">B.A.L.K.I.Z</span>
+            <span className="hdr-sub">Türkçe Yapay Zeka · v2.1</span>
+          </div>
         </div>
         <div className="hdr-stats">
           {[
             { l: 'Model',  v: 'LLaMA 3.3 70B' },
-            { l: 'Ses',    v: 'Çok Dilli'       },
+            { l: 'Ses',    v: 'FRIDAY Modu'     },
             { l: 'Hafıza', v: `${(chatHistory.length/2)|0} / 8 tur` },
           ].map(s => (
             <div key={s.l} className="hdr-stat">
               <span className="stat-l">{s.l}</span>
-              <span className="stat-v">{s.v}</span>
+              <span className="stat-v" style={{ color: col.main }}>{s.v}</span>
             </div>
           ))}
         </div>
         <div className="hdr-right">
-          <div className={`status-badge s-${status}`}>
-            <div className={`badge-dot ${status !== 'idle' ? 'pulse' : ''}`} />
+          <div className={`status-badge s-${status}`} style={{ borderColor: col.main + '66', color: col.main }}>
+            <div className={`badge-dot ${status !== 'idle' ? 'pulse' : ''}`} style={{ background: col.main }} />
             {statusLabel[status]}
           </div>
           <img src={ilkyarLogo} alt="İlkyar" className="hdr-logo" />
@@ -489,13 +605,13 @@ YASAK KONULAR (nazikçe konu değiştir):
         {/* LEFT PANEL */}
         <aside className="panel panel-l">
           <div className="card">
-            <div className="card-title"><span className="card-dot"/>⚡ Sistem Durumu</div>
+            <div className="card-title"><span className="card-dot" style={{ background: col.main }}/>⚡ Sistem Durumu</div>
             {[
               ['Yapay Zeka','Aktif','green'],
               ['Ses Motoru','Hazır','green'],
               ['Bağlantı','Güçlü','green'],
-              ['Mikrofon', streamRef.current ? 'Açık' : 'Kapalı', streamRef.current ? 'green':'red'],
-            ].map(([k,v,c])=>(
+              ['Mikrofon', streamRef.current ? 'Açık' : 'Kapalı', streamRef.current ? 'green' : 'red'],
+            ].map(([k, v, c]) => (
               <div key={k} className="row">
                 <span className="row-k">{k}</span>
                 <span className={`row-v ${c}`}>{v}</span>
@@ -504,17 +620,17 @@ YASAK KONULAR (nazikçe konu değiştir):
           </div>
 
           <div className="card">
-            <div className="card-title"><span className="card-dot"/>🎵 Ses Seviyesi</div>
+            <div className="card-title"><span className="card-dot" style={{ background: col.main }}/>🎵 Ses Seviyesi</div>
             <div className="vert-bars">
-              {Array.from({length:10}).map((_,i)=>(
+              {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="vbar"
                   style={{
-                    height: status!=='idle'
-                      ? `${14+audioLevel*86*Math.abs(Math.sin(i*0.9))}%`
-                      : '12%',
-                    background: col.main,
-                    opacity: status!=='idle' ? 0.7+audioLevel*0.3 : 0.2,
-                    animationDelay: `${i*0.1}s`,
+                    height: status !== 'idle'
+                      ? `${16 + audioLevel * 82 * Math.abs(Math.sin(i * 0.85 + audioLevel * 3))}%`
+                      : '10%',
+                    background: `linear-gradient(to top, ${col.main}, ${col.accent})`,
+                    opacity: status !== 'idle' ? 0.7 + audioLevel * 0.3 : 0.18,
+                    transition: 'height 0.1s ease, opacity 0.2s ease',
                   }}
                 />
               ))}
@@ -522,66 +638,87 @@ YASAK KONULAR (nazikçe konu değiştir):
           </div>
 
           <div className="card">
-            <div className="card-title"><span className="card-dot"/>📊 Kaynaklar</div>
-            {[['İşlemci',42],['Hafıza',memPct],['Ağ',88]].map(([l,p])=>(
-              <div key={l}>
+            <div className="card-title"><span className="card-dot" style={{ background: col.main }}/>📊 Kaynaklar</div>
+            {[['İşlemci', 42], ['Hafıza', memPct], ['Ağ', 88]].map(([l, p]) => (
+              <div key={l as string}>
                 <div className="row">
                   <span className="row-k">{l}</span>
                   <span className="row-v cyan">{Math.round(p as number)}%</span>
                 </div>
                 <div className="minibar">
-                  <div className="minibar-fill" style={{width:`${p}%`, background:col.main}} />
+                  <div className="minibar-fill" style={{ width: `${p}%`, background: col.main }} />
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* FUN FACT CARD */}
+          <div className="card fun-card">
+            <div className="card-title"><span className="card-dot" style={{ background: '#fbbf24' }}/>⭐ İpucu</div>
+            <p className="fun-tip">Mikrofon butonuna basarak benimle konuşabilirsin!</p>
+            <div className="fun-stars">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={14} fill="#fbbf24" color="#fbbf24" style={{ animationDelay: `${i * 0.2}s` }} className="fun-star" />
+              ))}
+            </div>
           </div>
         </aside>
 
         {/* CENTER STAGE */}
         <main className="center">
-          {/* JARVIS ORB + ORBITING DOTS */}
-          <div className="orb-scene">
-            <OrbitRing radius={175} count={12} duration={22} color={col.main} dotSize={3} pulsing/>
-            <OrbitRing radius={145} count={6}  duration={9}  color={col.main} dotSize={5} reverse/>
-            <OrbitRing radius={115} count={4}  duration={6}  color={col.main} dotSize={7} />
+
+          {/* 3D ORB SCENE */}
+          <div className="orb-scene" style={{ perspective: '600px' }}>
+            {/* Outer halo rings */}
+            <OrbitRing radius={190} count={14} duration={28} color={col.main} dotSize={2.5} tilt={70} />
+            <OrbitRing radius={165} count={10} duration={18} color={col.accent} dotSize={3.5} reverse tilt={20} phase={45} />
+            <OrbitRing radius={138} count={7}  duration={11} color={col.main} dotSize={5}   tilt={45} phase={90} />
+            <OrbitRing radius={112} count={5}  duration={7}  color={col.accent} dotSize={6.5} reverse tilt={15} />
 
             {/* Halo glow */}
-            <div className="orb-halo" style={{boxShadow:`0 0 80px 20px ${col.glow}28`}} />
+            <div className="orb-halo" style={{ boxShadow: `0 0 100px 30px ${col.glow}22, 0 0 40px 10px ${col.glow}44` }} />
 
-            {/* Main orb – genie key triggers CSS re-animation */}
+            {/* Main orb */}
             <div
               key={genieKey}
-              className={`orb orb-${status}${genieKey>0 ? ' genie-in':''}`}
-              style={{ transform:`scale(${orbScale})` }}
+              className={`orb orb-${status}${genieKey > 0 ? ' genie-in' : ''}`}
+              style={{ transform: `scale(${orbScale})` }}
               onClick={status === 'speaking' ? undefined : toggle}
             >
-              <div className="blob b1" style={{background:`radial-gradient(circle at 30% 30%, ${col.main}99, transparent 70%)`}} />
-              <div className="blob b2" style={{background:`radial-gradient(circle at 70% 65%, ${col.main}55, transparent 70%)`}} />
+              <div className="blob b1" style={{ background: `radial-gradient(circle at 30% 30%, ${col.main}aa, transparent 65%)` }} />
+              <div className="blob b2" style={{ background: `radial-gradient(circle at 70% 65%, ${col.accent}66, transparent 65%)` }} />
               <div className="blob b3" />
+              <div className="orb-inner-ring" style={{ borderColor: col.main + '44' }} />
               <div className="orb-icon">
-                {status==='processing' ? <Activity size={42} className="spin-anim"/>
-                 : status==='speaking' ? <Volume2  size={42} className="breathe-anim"/>
-                 : status==='listening'? <Mic      size={42} className="pulse-anim"/>
-                 :                       <Mic      size={42}/>}
+                {status === 'processing' ? <Activity size={44} className="spin-anim" style={{ color: col.main }}/>
+                 : status === 'speaking' ? <Volume2  size={44} className="breathe-anim" style={{ color: col.main }}/>
+                 : status === 'listening'? <Mic      size={44} className="pulse-anim" style={{ color: col.main }}/>
+                 :                         <Mic      size={44} style={{ color: col.main }}/>}
               </div>
+              {/* Orb emoji overlay for children */}
+              <div className="orb-emoji">{statusEmoji[status]}</div>
             </div>
 
-            <div className="orb-label" style={{color:col.main}}>{statusLabel[status]}</div>
+            <div className="orb-label" style={{ color: col.main }}>{statusLabel[status]}</div>
+
+            {/* Thinking overlay appears during processing */}
+            {showThinking && <ThinkingScreen color={col.glow} />}
           </div>
 
           {/* WAVEFORM */}
           <div className="waveform">
-            {Array.from({length:40}).map((_,i)=>{
-              const active = status==='listening'||status==='speaking';
+            {Array.from({ length: 44 }).map((_, i) => {
+              const active = status === 'listening' || status === 'speaking';
               const h = active
-                ? Math.abs(Math.sin((i/40)*Math.PI*6 + audioLevel*8))*audioLevel*42+4 : 4;
+                ? Math.abs(Math.sin((i / 44) * Math.PI * 7 + audioLevel * 9)) * audioLevel * 46 + 4 : 4;
               return (
                 <div key={i} className="wbar"
                   style={{
                     height: h,
-                    background: col.main,
-                    opacity: active ? 0.35+audioLevel*0.55 : 0.12,
-                    boxShadow: active ? `0 0 5px ${col.glow}99`:undefined,
+                    background: `linear-gradient(to top, ${col.main}, ${col.accent})`,
+                    opacity: active ? 0.35 + audioLevel * 0.55 : 0.10,
+                    boxShadow: active ? `0 0 6px ${col.glow}88` : undefined,
+                    transition: 'height 0.08s ease',
                   }}
                 />
               );
@@ -592,19 +729,19 @@ YASAK KONULAR (nazikçe konu değiştir):
           <div className="msg-area">
             {error && (
               <div className="bubble bubble-err">
-                <span className="bubble-lbl">⚠️ Sistem</span>
+                <span className="bubble-lbl">⚠️ Hata</span>
                 <p>{error}</p>
               </div>
             )}
             {transcript && (
-              <div className="bubble bubble-user">
-                <span className="bubble-lbl">🧒 Sen</span>
+              <div className="bubble bubble-user" style={{ borderColor: palette.listening.main + '55' }}>
+                <span className="bubble-lbl" style={{ color: palette.listening.main }}>🧒 Sen</span>
                 <p>{transcript}</p>
               </div>
             )}
             {response && (
-              <div className="bubble bubble-ai">
-                <span className="bubble-lbl">🤖 BALKIZ</span>
+              <div className="bubble bubble-ai" style={{ borderColor: col.main + '55' }}>
+                <span className="bubble-lbl" style={{ color: col.main }}>🤖 BALKIZ</span>
                 <p>{response}</p>
               </div>
             )}
@@ -612,36 +749,52 @@ YASAK KONULAR (nazikçe konu değiştir):
 
           {/* MIC BUTTON */}
           <button
-            className={`mic-btn${status==='listening'?' rec':''}`}
+            className={`mic-btn${status === 'listening' ? ' rec' : ''}`}
             style={{
-              borderColor: col.main,
-              color: col.main,
-              boxShadow: status!=='idle' ? `0 0 22px ${col.glow}66` : undefined,
+              background: status === 'listening'
+                ? `linear-gradient(135deg, ${palette.listening.main}22, ${palette.listening.main}11)`
+                : `linear-gradient(135deg, ${col.main}18, ${col.accent}0a)`,
+              borderColor: status === 'listening' ? palette.listening.main : col.main,
+              color: status === 'listening' ? palette.listening.main : col.main,
+              boxShadow: status !== 'idle'
+                ? `0 0 28px ${col.glow}55, 0 0 8px ${col.glow}33`
+                : `0 4px 20px rgba(0,0,0,0.3)`,
             }}
             onClick={toggle}
-            disabled={status==='processing'||status==='speaking'}
+            disabled={status === 'processing' || status === 'speaking'}
           >
-            {status==='listening'
-              ? <><VolumeX size={20}/> Durdur</>
-              : <><Mic size={20}/> Konuş</>}
+            {status === 'listening'
+              ? <><VolumeX size={22}/> Durdur</>
+              : <><Mic size={22}/> Konuş</>}
           </button>
 
-          {status==='speaking' && (
-            <button className="stop-btn" onClick={stopSpeaking}>
-              <VolumeX size={13}/> Sustur
+          {status === 'speaking' && (
+            <button className="stop-btn" onClick={stopSpeaking}
+              style={{ borderColor: col.main + '66', color: col.main }}>
+              <VolumeX size={14}/> Sustur
             </button>
           )}
+
+          {/* CHILD-FRIENDLY HINT */}
+          <div className="hint-text">
+            {status === 'idle'      && '👆 Konuşmak için butona dokun!'}
+            {status === 'listening' && '🎤 Seni dinliyorum, konuş!'}
+            {status === 'processing'&& '⏳ Harika bir cevap hazırlıyorum…'}
+            {status === 'speaking'  && '👂 Lütfen dinle!'}
+          </div>
         </main>
 
         {/* RIGHT PANEL */}
         <aside className="panel panel-r">
           <div className="card">
-            <div className="card-title"><span className="card-dot"/>💬 Konuşma Geçmişi</div>
-            {chatHistory.length===0
-              ? <p className="empty-log">Henüz konuşma yok...</p>
-              : chatHistory.slice(-8).map((m,i)=>(
+            <div className="card-title"><span className="card-dot" style={{ background: col.main }}/>💬 Konuşma Geçmişi</div>
+            {chatHistory.length === 0
+              ? <p className="empty-log">Henüz konuşma yok…<br/>Haydi başlayalım! 🎉</p>
+              : chatHistory.slice(-8).map((m, i) => (
                 <div key={i} className={`log-entry le-${m.role}`}>
-                  <span className="log-who">{m.role==='user'?'🧒 Sen':'🤖 BALKIZ'}</span>
+                  <span className="log-who" style={{ color: m.role === 'user' ? palette.listening.main : col.main }}>
+                    {m.role === 'user' ? '🧒 Sen' : '🤖 BALKIZ'}
+                  </span>
                   <span className="log-txt">{m.content}</span>
                 </div>
               ))
@@ -649,33 +802,57 @@ YASAK KONULAR (nazikçe konu değiştir):
           </div>
 
           <div className="card">
-            <div className="card-title"><span className="card-dot"/>🧠 Hafıza</div>
-            <div className="row"><span className="row-k">Mesaj Sayısı</span><span className="row-v cyan">{chatHistory.length}</span></div>
+            <div className="card-title"><span className="card-dot" style={{ background: col.main }}/>🧠 Hafıza</div>
+            <div className="row">
+              <span className="row-k">Mesaj Sayısı</span>
+              <span className="row-v" style={{ color: col.main }}>{chatHistory.length}</span>
+            </div>
             <div className="row"><span className="row-k">Kapasite</span><span className="row-v">16 mesaj</span></div>
-            <div className="minibar"><div className="minibar-fill" style={{width:`${memPct}%`,background:col.main}}/></div>
+            <div className="minibar">
+              <div className="minibar-fill" style={{ width: `${memPct}%`, background: `linear-gradient(to right, ${col.main}, ${col.accent})` }}/>
+            </div>
+            <div className="mem-pct">{Math.round(memPct)}% dolu</div>
           </div>
 
           <div className="card">
-            <div className="card-title"><span className="card-dot"/>📋 Oturum</div>
-            <div className="row"><span className="row-k">Toplam Tur</span><span className="row-v cyan">{(chatHistory.length/2)|0}</span></div>
-            <div className="row"><span className="row-k">Durum</span>
-              <span className={`row-v ${status==='idle'?'green':'yellow'}`}>{statusLabel[status]}</span>
+            <div className="card-title"><span className="card-dot" style={{ background: col.main }}/>📋 Oturum</div>
+            <div className="row">
+              <span className="row-k">Toplam Tur</span>
+              <span className="row-v" style={{ color: col.main }}>{(chatHistory.length / 2) | 0}</span>
+            </div>
+            <div className="row">
+              <span className="row-k">Durum</span>
+              <span className={`row-v ${status === 'idle' ? 'green' : 'yellow'}`}>{statusLabel[status]}</span>
             </div>
             <div className="row"><span className="row-k">Ses Motoru</span><span className="row-v green">AKTİF</span></div>
           </div>
+
+          {/* ACHIEVEMENTS / MOTIVATION */}
+          <div className="card achieve-card">
+            <div className="card-title"><span className="card-dot" style={{ background: '#fbbf24' }}/>🏆 Başarılar</div>
+            <div className={`achieve-item ${chatHistory.length >= 2 ? 'unlocked' : ''}`}>
+              <span>🗣️</span> İlk Konuşma
+            </div>
+            <div className={`achieve-item ${chatHistory.length >= 10 ? 'unlocked' : ''}`}>
+              <span>🔥</span> 5 Tur Tamamlandı
+            </div>
+            <div className={`achieve-item ${chatHistory.length >= 20 ? 'unlocked' : ''}`}>
+              <span>🌟</span> Sohbet Ustası
+            </div>
+          </div>
         </aside>
 
-      </div>{/* /body */}
+      </div>
 
       {/* FOOTER */}
       <footer className="ftr">
         <span className="ftr-txt">
-          BALKIZ'ı sorgula, geliştir, büyüt.{' '}
+          BALKIZ ile öğren, büyü, keşfet!{' '}
           <a href="mailto:simseklermustafaberke@gmail.com">simseklermustafaberke@gmail.com</a>
         </span>
         <div className="ftr-dots">
-          {[status!=='idle', status==='speaking'||status==='processing', status==='speaking'].map((on,i)=>(
-            <div key={i} className={`fdot ${on?'on':''}`}/>
+          {[status !== 'idle', status === 'speaking' || status === 'processing', status === 'speaking'].map((on, i) => (
+            <div key={i} className={`fdot ${on ? 'on' : ''}`} style={on ? { background: col.main, boxShadow: `0 0 6px ${col.main}` } : {}} />
           ))}
         </div>
         <span className="ftr-txt">Mustafa Berke Şimşekler © 2025</span>
