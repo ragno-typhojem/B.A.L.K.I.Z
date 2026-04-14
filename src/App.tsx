@@ -61,7 +61,10 @@ Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermem
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       audioRef.current?.pause();
       if (recTimeoutRef.current) clearTimeout(recTimeoutRef.current);
-      thinkingAudioRef.current?.pause();
+      if (thinkingAudioRef.current) {
+        thinkingAudioRef.current.pause();
+        thinkingAudioRef.current.currentTime = 0;
+      }
     };
   }, []);
 
@@ -169,12 +172,15 @@ Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermem
       if (!text || text.length < 2) { setStatus('idle'); return; }
       setTranscript(text);
       await handleSpeech(text);
-    } catch (e) {
-      setError('Ses tanıma başarısız: ' + e.message);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Bilinmeyen hata';
+      setError('Ses tanıma başarısız: ' + errorMessage);
       setStatus('idle');
     } finally {
-      thinkingAudioRef.current?.pause();
-      thinkingAudioRef.current?.currentTime = 0;
+      if (thinkingAudioRef.current) {
+        thinkingAudioRef.current.pause();
+        thinkingAudioRef.current.currentTime = 0;
+      }
     }
   };
 
@@ -477,7 +483,7 @@ Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermem
                 background:
                   status === 'idle'
                     ? 'radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 70%)'
-                    : `radial-gradient(circle, ${col.smoke.replace(/[\d.]+)$/, '0.18)')} 0%, transparent 70%)`,
+                    : `radial-gradient(circle, ${col.smoke.replace(/[\d.]+(?=\))/, '0.18')} 0%, transparent 70%)`,
               }}
             />
 
