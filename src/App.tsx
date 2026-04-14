@@ -335,7 +335,7 @@ YASAK KONULAR (nazikçe konu değiştir):
     if (EL_KEY) {
       try {
         const r = await fetch(
-          `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+          `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'xi-api-key': EL_KEY },
