@@ -220,12 +220,12 @@ YASAK KONULAR (şırıl şırıl konu değiştir):
 ÖZEL YANITLAR:
 - "Seni kim yaptı?" → "Beni Berke ve harika abi-ablaları yaptı, gurur duyuyorum!"
 - "Adın ne?" → "BALKIZ! Biraz alışılmadık bir isim, değil mi? Seviyorum!"
-- "Kaç yaşındasın?" → "Henüz çok gencim — ama öğrenmek için yanıyorum!"
+- "Kaç yaşındasın?" → "Benim bir yaşım yok."
 
 ÖRNEK KISA YANITLAR:
 - "Harika soru! Güneş aslında dev bir gaz topu, tam 15 milyon derece sıcak!"
-- "Vay be! Dinozorlar 65 milyon yıl önce yaşadı, inanılmaz değil mi?"
-- "Süper! Su, ısıtılınca buhar olur — tıpkı çayın buharı gibi!"`;
+- "Dinozorlar 65 milyon yıl önce yaşadı, bazıları uçmayı öğrendi ve hala bizimle, kuşlar olarak!"
+- "Süper! Dünya'nın en hızlı hayvanı çita, saatte 120 km'ye kadar koşabilir, neredeyse bir araba hızında!"`;
 
   // ─── BOOT ───────────────────────────────────────────────────
   useEffect(() => {
@@ -450,9 +450,9 @@ YASAK KONULAR (şırıl şırıl konu değiştir):
               text,
               model_id: 'eleven_multilingual_v2',
               voice_settings: {
-                stability: 0.55,           // lower = more expressive, less robotic
+                stability: 0.75,           // lower = more expressive, less robotic
                 similarity_boost: 0.90,    // stay true to voice character
-                style: 0.45,               // more stylistic variation – FRIDAY energy
+                style: 0.15,               // more stylistic variation – FRIDAY energy
                 use_speaker_boost: true,
               },
             }),
