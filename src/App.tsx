@@ -26,18 +26,19 @@ const App = () => {
   const animFrameRef     = useRef<number | null>(null);
   const recTimeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasGreetedRef    = useRef(false);
+  const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY;
-  const VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
+  const VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Değiştirildi: Daha stabil, FRIDAY benzeri kadın sesi (multilingual destekli, sakin ve profesyonel)
 
   const SYSTEM_PROMPT = `İsmin: "BALKIZ" - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
 Kısa, net, zeki konuş. Maksimum 1-2 cümle. İstenildiğinde hassasiyete uygun espiri yapabilirsin.
-Türkçe konuş. Robotik değil, doğal ol.
+Türkçe konuş. Robotik değil, doğal ol. Her zaman bir yanıt ver, sessiz kalma.
 Din/siyaset/cinsellik/şiddet/ Popüler Kültür/ünlüler hakkında konuşma. Sorulursa bile, konuyu belli etmeden değiştirmeye çalış: "Orada hava ne durumda?" gibi.
 Yapamayacakların: "Bunu maalesef yapmayı henüz öğrenmedim."
 Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
-`;
+Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermeme hatası yapma.`;
 
   /* ── BOOT ─────────────────────────────────────────── */
   useEffect(() => {
@@ -50,12 +51,17 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
         setTimeout(() => { setBooted(true); initAudio(); }, 400);
       }
     }, 25);
+
+    // Thinking sound effect yükle
+    thinkingAudioRef.current = new Audio('/sounds/thinking.mp3'); // Ses dosyası ekleyin (düşünme efekti)
+
     return () => {
       clearInterval(t);
       streamRef.current?.getTracks().forEach(tr => tr.stop());
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       audioRef.current?.pause();
       if (recTimeoutRef.current) clearTimeout(recTimeoutRef.current);
+      thinkingAudioRef.current?.pause();
     };
   }, []);
 
@@ -78,7 +84,6 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
       'Hazırım. Ne yapıyoruz?',
       'Seni dinliyorum.',
       'Ben geldim. Nasılsın?'
-      
     ];
     const g = msgs[Math.floor(Math.random() * msgs.length)];
     setResponse(g);
@@ -137,6 +142,8 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
         clearTimeout(recTimeoutRef.current);
         recTimeoutRef.current = null;
       }
+      // Düşünme sesi çal
+      thinkingAudioRef.current?.play();
     }
   };
 
@@ -162,9 +169,12 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
       if (!text || text.length < 2) { setStatus('idle'); return; }
       setTranscript(text);
       await handleSpeech(text);
-    } catch {
-      setError('Ses tanıma başarısız');
+    } catch (e) {
+      setError('Ses tanıma başarısız: ' + e.message);
       setStatus('idle');
+    } finally {
+      thinkingAudioRef.current?.pause();
+      thinkingAudioRef.current?.currentTime = 0;
     }
   };
 
@@ -172,6 +182,7 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
   const handleSpeech = async (text: string) => {
     try {
       const ai = await getAI(text);
+      if (!ai) throw new Error('Yanıt alınamadı');
       setResponse(ai);
       await speak(ai);
     } catch {
@@ -223,28 +234,34 @@ Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
     setTimeout(() => setShowSmoke(false), 1400);
     startViz();
     try {
-const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`, {
-  method: 'POST',
-  headers: { 
-    'Content-Type': 'application/json', 
-    'xi-api-key': EL_KEY 
-  },
-  body: JSON.stringify({
-    text,
-    model_id: 'eleven_multilingual_v2', // Türkçe için en stabil model budur
-    voice_settings: { 
-      stability: 0.7, 
-      similarity_boost: 0.8 
-    }
-  })
-});
-      if (!r.ok) throw new Error(`${r.status}`);
+      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'xi-api-key': EL_KEY 
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { 
+            stability: 0.8, // Daha stabil hale getirildi
+            similarity_boost: 0.85, // FRIDAY benzeri sakinlik için artırıldı
+            style: 0.2 // Daha az robotik, doğal ton
+          }
+        })
+      });
+      if (!r.ok) {
+        if (r.status === 402) {
+          setError('ElevenLabs kredileri yetersiz veya limit aşıldı. Lütfen hesabınızı kontrol edin.');
+        }
+        throw new Error(`${r.status}`);
+      }
       const blob = await r.blob();
       const url  = URL.createObjectURL(blob);
       if (!audioRef.current) audioRef.current = new Audio();
       audioRef.current.src     = url;
       audioRef.current.onended = () => { URL.revokeObjectURL(url); setStatus('idle'); stopViz(); };
-      audioRef.current.onerror = () => { URL.revokeObjectURL(url); setStatus('idle'); stopViz(); };
+      audioRef.current.onerror = () => { URL.revokeObjectURL(url); setStatus('idle'); stopViz(); setError('Ses çalma hatası'); };
       await audioRef.current.play();
     } catch {
       setStatus('idle');
@@ -273,7 +290,7 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
 
   /* ── BOOT EKRANI ──────────────────────────────────── */
   if (!booted) return (
-    <div className="boot">
+    <div className="boot child-friendly">
       <div className="hud-bg" />
       <div className="hud-grid" />
       <div className="boot-ring-wrap">
@@ -307,7 +324,7 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
   /* ── ANA UYGULAMA ─────────────────────────────────── */
   return (
     <>
-      <div className="hud-bg" />
+      <div className="hud-bg child-bg" /> {/* Çocuk dostu arka plan */}
       <div className="hud-grid" />
       <div className="hud-scan" />
       <div className="corner corner-tl" />
@@ -315,7 +332,7 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
       <div className="corner corner-bl" />
       <div className="corner corner-br" />
 
-      <div className="app">
+      <div className="app child-friendly"> {/* Çocuk dostu stiller ekle */}
 
         {/* ── HEADER ──────────────────────────────────── */}
         <header className="hud-header">
@@ -426,67 +443,76 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
           <div className="hud-circle hud-circle-1" />
           <div className="hud-circle hud-circle-2" />
 
-{/* ── ORB ─────────────────────────────────────── */}
-<div
-  className="orb-wrap"
-  style={{ cursor: status === 'processing' ? 'wait' : 'pointer' }}
-  onClick={status === 'speaking' ? undefined : toggle}
->
-  {/* Cin dumanı — sadece konuşma başında, 1 kez */}
-  {showSmoke && (
-    <div className="genie-smoke">
-      <div className="smoke-col smoke-l" style={{ background: col.smoke }} />
-      <div className="smoke-col smoke-r" style={{ background: col.smoke }} />
-      <div className="smoke-col smoke-c" style={{ background: col.smoke }} />
-    </div>
-  )}
+          {/* ── JARVIS-like Rolling Circle with Dots ────── */}
+          <div className="jarvis-spinner" style={{ display: status === 'processing' ? 'block' : 'none' }}>
+            <div className="spinner-circle">
+              <div className="dot dot1"></div>
+              <div className="dot dot2"></div>
+              <div className="dot dot3"></div>
+              <div className="dot dot4"></div>
+              <div className="dot dot5"></div>
+              <div className="dot dot6"></div>
+            </div>
+          </div>
 
-  {/* Dış halo */}
-  <div
-    className="orb-halo"
-    style={{
-      background:
-        status === 'idle'
-          ? 'radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 70%)'
-          : `radial-gradient(circle, ${col.smoke.replace(/[\d.]+\)$/, '0.18)')} 0%, transparent 70%)`,
-    }}
-  />
+          {/* ── ORB (Çocuk dostu hale getirildi) ────────── */}
+          <div
+            className="orb-wrap"
+            style={{ cursor: status === 'processing' ? 'wait' : 'pointer' }}
+            onClick={status === 'speaking' ? undefined : toggle}
+          >
+            {/* Cin dumanı */}
+            {showSmoke && (
+              <div className="genie-smoke">
+                <div className="smoke-col smoke-l" style={{ background: col.smoke }} />
+                <div className="smoke-col smoke-r" style={{ background: col.smoke }} />
+                <div className="smoke-col smoke-c" style={{ background: col.smoke }} />
+              </div>
+            )}
 
-  {/* Dönen halkalar */}
-  <div className={`orb-ring-outer ${status !== 'idle' ? 'active' : ''} ${status === 'listening' ? 'listening' : ''}`} />
-  <div className={`orb-ring-spin ${status}`} />
+            {/* Dış halo */}
+            <div
+              className="orb-halo"
+              style={{
+                background:
+                  status === 'idle'
+                    ? 'radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 70%)'
+                    : `radial-gradient(circle, ${col.smoke.replace(/[\d.]+)$/, '0.18)')} 0%, transparent 70%)`,
+              }}
+            />
 
-  {/* BLOB BODY
-      - key=speakKey → speaking başlayınca genieAppear tetiklenir
-      - idle: CSS scale(0.45) + opacity:0.25
-      - speaking: JS inline scale(orbScale) ekolayzer etkisi  */}
-  <div
-    key={speakKey}
-    className={`orb-body ${status} ${speakKey > 0 && status === 'speaking' ? 'genie-enter' : ''}`}
-    style={
-      status === 'speaking'
-        ? { transform: `scale(${orbScale})` }   // ekolayzer: audioLevel ile büyür
-        : undefined
-    }
-  >
-    <div className={`orb-blob orb-blob-1 ${status}`} />
-    <div className={`orb-blob orb-blob-2 ${status}`} />
-    <div className={`orb-blob orb-blob-3 ${status}`} />
+            {/* Dönen halkalar */}
+            <div className={`orb-ring-outer ${status !== 'idle' ? 'active' : ''} ${status === 'listening' ? 'listening' : ''}`} />
+            <div className={`orb-ring-spin ${status}`} />
 
-    <div className="orb-icon">
-      {status === 'processing' ? (
-        <Activity size={36} style={{ animation: 'spin 1.2s linear infinite' }} />
-      ) : status === 'speaking' ? (
-        <Volume2 size={36} />
-      ) : (
-        <Mic size={36} />
-      )}
-    </div>
-  </div>
-</div>
+            {/* BLOB BODY */}
+            <div
+              key={speakKey}
+              className={`orb-body ${status} ${speakKey > 0 && status === 'speaking' ? 'genie-enter' : ''}`}
+              style={
+                status === 'speaking'
+                  ? { transform: `scale(${orbScale})` }
+                  : undefined
+              }
+            >
+              <div className={`orb-blob orb-blob-1 ${status}`} />
+              <div className={`orb-blob orb-blob-2 ${status}`} />
+              <div className={`orb-blob orb-blob-3 ${status}`} />
 
-          {/* Dalga formu */}
-          <div className="waveform">
+              <div className="orb-icon">
+                {status === 'processing' ? (
+                  <Activity size={36} style={{ animation: 'spin 1.2s linear infinite' }} />
+                ) : status === 'speaking' ? (
+                  <Volume2 size={36} />
+                ) : (
+                  <Mic size={36} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Dalga formu (Çocuklar için daha renkli hale getirildi) */}
+          <div className="waveform colorful-wave">
             {Array.from({ length: 36 }).map((_, i) => {
               const active = status === 'listening' || status === 'speaking';
               const h = active
@@ -501,7 +527,7 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
                     background:
                       status === 'listening'
                         ? `rgba(255,60,60,${0.4 + audioLevel * 0.5})`
-                        : `rgba(0,212,255,${0.3 + audioLevel * 0.6})`,
+                        : `linear-gradient(to top, #ff3c3c, #00d4ff)`, // Renkli gradyan
                     boxShadow: active ? `0 0 4px ${col.glow}66` : 'none',
                   }}
                 />
@@ -509,11 +535,11 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
             })}
           </div>
 
-          {/* Mesaj alanı */}
-          <div className="msg-area">
+          {/* Mesaj alanı (Daha okunaklı font ve renkler) */}
+          <div className="msg-area readable-font">
             {error && (
               <div
-                className="msg-bubble ai"
+                className="msg-bubble ai error-bubble"
                 style={{ borderLeftColor: 'rgba(255,60,60,0.5)', color: 'rgba(255,120,120,0.8)' }}
               >
                 <span className="msg-label">SİSTEM</span>⚠️ {error}
@@ -613,8 +639,7 @@ const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/s
         {/* ── FOOTER ──────────────────────────────────── */}
         <footer className="hud-footer">
           <span className="footer-text">
-            balkiz yanıtlarını araştır, sorgula, geliştir. geri bildirimlerinle bu yapay zekayı daha iyi hale getirebilirsin. iletişim: <a href="mailto:simseklermustafaberke@gmail.com"/>
-
+            balkiz yanıtlarını araştır, sorgula, geliştir. geri bildirimlerinle bu yapay zekayı daha iyi hale getirebilirsin. iletişim: <a href="mailto:simseklermustafaberke@gmail.com">simseklermustafaberke@gmail.com</a>
           </span>
           <div className="footer-dots">
             <div className={`footer-dot ${status !== 'idle' ? 'on' : ''}`} />
