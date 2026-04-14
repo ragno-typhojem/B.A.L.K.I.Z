@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Mic, VolumeX, Volume2, Activity, Cpu, Radio, Zap, Shield, Star } from 'lucide-react';
 import ilkyarLogo from './assets/ilkyar_logo.png';
 import './App.css';
