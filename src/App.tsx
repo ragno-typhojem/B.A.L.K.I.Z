@@ -397,7 +397,7 @@ YASAK KONULAR (şırıl şırıl konu değiştir):
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           messages,
-          max_tokens: 90,
+          max_tokens: 130,
           temperature: 0.78,
           top_p: 0.92,
           presence_penalty: 0.3,
