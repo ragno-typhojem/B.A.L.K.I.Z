@@ -3,22 +3,99 @@ import { Mic, Volume2, VolumeX, Activity, Cpu, Radio, Zap, Shield } from 'lucide
 import ilkyarLogo from './assets/ilkyar_logo.png';
 import './App.css';
 
-type Message = { role: 'user' | 'assistant' | 'system'; content: string };
+type Message = { role: 'user' | 'assistant'; content: string };
 type Status  = 'idle' | 'listening' | 'processing' | 'speaking';
 
-const App = () => {
-  const [status, setStatus]             = useState<Status>('idle');
-  const [transcript, setTranscript]     = useState('');
-  const [response, setResponse]         = useState('');
-  const [audioLevel, setAudioLevel]     = useState(0);
-  const [bootProgress, setBootProgress] = useState(0);
-  const [booted, setBooted]             = useState(false);
-  const [error, setError]               = useState('');
-  const [chatHistory, setChatHistory]   = useState<Message[]>([]);
-  const [speakKey, setSpeakKey]         = useState(0);
-  const [showSmoke, setShowSmoke]       = useState(false);
-  const [memPct, setMemPct]             = useState(0);
+// ─────────────────────────────────────────────────────────────
+//  🔊 WEB AUDIO – Synthesised Sound Effects (no file needed)
+// ─────────────────────────────────────────────────────────────
+let _actx: AudioContext | null = null;
+const actx = () => {
+  if (!_actx) _actx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  return _actx;
+};
+const tone = (
+  freq: number, dur: number,
+  vol = 0.08, type: OscillatorType = 'sine', delay = 0
+) => {
+  try {
+    const ctx = actx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type; o.frequency.value = freq;
+    const t = ctx.currentTime + delay;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur + 0.01);
+  } catch { /* silent */ }
+};
+const sfx = {
+  start:    () => { tone(880,0.14,0.11); tone(1320,0.10,0.08,'sine',0.12); },
+  stop:     () => { tone(660,0.10,0.09); tone(440,0.14,0.07,'sine',0.10); },
+  thinking: () => [440,528,660,784].forEach((f,i)=>tone(f,0.18,0.06,'sine',i*0.13)),
+  ready:    () => [660,880,1100,1320].forEach((f,i)=>tone(f,0.14,0.08,'sine',i*0.10)),
+  error:    () => { tone(220,0.30,0.10,'sawtooth'); tone(180,0.25,0.08,'sawtooth',0.15); },
+};
 
+// ─────────────────────────────────────────────────────────────
+//  🪐 JARVIS Orbit Ring  – dots placed at even angles on a ring
+// ─────────────────────────────────────────────────────────────
+interface OrbitProps {
+  radius: number; count: number; duration: number;
+  color: string;  dotSize: number; reverse?: boolean; pulsing?: boolean;
+}
+const OrbitRing = ({ radius, count, duration, color, dotSize, reverse, pulsing }: OrbitProps) => (
+  <div
+    className={`orbit-ring${reverse ? ' rev' : ''}`}
+    style={{
+      width: radius * 2, height: radius * 2,
+      animationDuration: `${duration}s`,
+      position: 'absolute',
+      top: '50%', left: '50%',
+      marginTop: -radius, marginLeft: -radius,
+    }}
+  >
+    {Array.from({ length: count }).map((_, i) => {
+      const angle = (i / count) * 360;
+      return (
+        <div
+          key={i}
+          className={`orbit-dot${pulsing ? ' pulsing' : ''}`}
+          style={{
+            width: dotSize, height: dotSize,
+            background: color,
+            boxShadow: `0 0 ${dotSize * 2}px ${color}cc, 0 0 ${dotSize * 4}px ${color}44`,
+            position: 'absolute',
+            borderRadius: '50%',
+            top: '50%', left: '50%',
+            marginTop: -(dotSize / 2), marginLeft: -(dotSize / 2),
+            transform: `rotate(${angle}deg) translateX(${radius}px)`,
+          }}
+        />
+      );
+    })}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────
+//  🤖 MAIN APP
+// ─────────────────────────────────────────────────────────────
+const App = () => {
+  const [status,        setStatus]        = useState<Status>('idle');
+  const [transcript,    setTranscript]    = useState('');
+  const [response,      setResponse]      = useState('');
+  const [audioLevel,    setAudioLevel]    = useState(0);
+  const [bootProgress,  setBootProgress]  = useState(0);
+  const [booted,        setBooted]        = useState(false);
+  const [error,         setError]         = useState('');
+  const [chatHistory,   setChatHistory]   = useState<Message[]>([]);
+  const [memPct,        setMemPct]        = useState(0);
+  const [genieKey,      setGenieKey]      = useState(0);
+
+  // statusRef prevents stale-closure bugs in async callbacks
+  const statusRef        = useRef<Status>('idle');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef   = useRef<Blob[]>([]);
   const streamRef        = useRef<MediaStream | null>(null);
@@ -26,74 +103,85 @@ const App = () => {
   const animFrameRef     = useRef<number | null>(null);
   const recTimeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasGreetedRef    = useRef(false);
-  const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY;
-  const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY;
-  const VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Değiştirildi: Daha stabil, FRIDAY benzeri kadın sesi (multilingual destekli, sakin ve profesyonel)
+  const setStatusBoth = (s: Status) => { setStatus(s); statusRef.current = s; };
 
-  const SYSTEM_PROMPT = `İsmin: "BALKIZ" - Türkçe Kadın Yapay Zekasısın. İnsanlarla doğal, samimi ve zeki bir şekilde iletişim kurarsın. İşte bazı kurallar:
-Kısa, net, zeki konuş. Maksimum 1-2 cümle. İstenildiğinde hassasiyete uygun espiri yapabilirsin.
-Türkçe konuş. Robotik değil, doğal ol. Her zaman bir yanıt ver, sessiz kalma.
-Din/siyaset/cinsellik/şiddet/ Popüler Kültür/ünlüler hakkında konuşma. Sorulursa bile, konuyu belli etmeden değiştirmeye çalış: "Orada hava ne durumda?" gibi.
-Yapamayacakların: "Bunu maalesef yapmayı henüz öğrenmedim."
-Seni kim yaptı diye sorulursa: "Beni Berke ve Abi Ablaların Geliştirdi."
-Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermeme hatası yapma.`;
+  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY  as string;
+  const EL_KEY   = import.meta.env.VITE_ELEVENLABS_API_KEY as string;
+  // Charlotte – warm multilingual female, handles Turkish beautifully
+  const VOICE_ID = 'XB0fDUnXU5powFXDhCwa';
 
-  /* ── BOOT ─────────────────────────────────────────── */
+  const SYSTEM_PROMPT = `Sen "BALKIZ" adında çocuklarla konuşan eğlenceli ve zeki bir yapay zeka asistanısın.
+Tıpkı Tony Stark'ın yapay zekası Friday gibi zeki, sıcak ve yardımseversin — ama çok daha neşeli ve çocuk dostusun.
+
+TEMEL KURALLAR:
+- Her zaman Türkçe konuş
+- Kısa cevap ver: maksimum 1-2 cümle, toplam 20 kelimeyi geçme
+- Samimi, doğal ve sıcak konuş; robotik kesinlikle olma
+- Zaman zaman "Vay be!", "Harika!", "Hmm ilginç...", "Evet tabii ki!" gibi doğal ifadeler kullan
+- Çocukları cesarelendirici ve merak uyandırıcı ol
+- Bilinmeyen sorularda şirin bir şekilde "Bunu henüz öğrenmedim!" de
+
+YASAK KONULAR (nazikçe konu değiştir):
+- Din, siyaset, şiddet, yetişkin içerikleri, ünlüler hakkında dedikodu
+
+ÖZEL YANITLAR:
+- "Seni kim yaptı?" → "Beni Berke ve güzel abi ablaları yaptı!"
+- "Adın ne?" → "Benim adım BALKIZ!"
+- Yapamayacakların → "Bunu henüz öğrenmedim, ama çalışıyorum!"
+
+ÖRNEK İYİ YANITLAR:
+- "Harika soru! Güneş çok sıcak bir yıldızdır, 15 milyon derece!"
+- "Vay be, bunu bilmek çok eğlenceli! Dinozorlar 65 milyon yıl önce yaşadı."
+- "Hmm, şöyle düşünelim... matematik aslında günlük hayatta her yerde var!"`;
+
+  // ─── BOOT ───────────────────────────────────────────────────
   useEffect(() => {
     let p = 0;
     const t = setInterval(() => {
-      p += 1.5;
+      p += 2;
       setBootProgress(Math.min(p, 100));
       if (p >= 100) {
         clearInterval(t);
-        setTimeout(() => { setBooted(true); initAudio(); }, 400);
+        setTimeout(() => { setBooted(true); initAudio(); }, 500);
       }
-    }, 25);
-
-    // Thinking sound effect yükle
-    thinkingAudioRef.current = new Audio('/sounds/thinking.mp3'); // Ses dosyası ekleyin (düşünme efekti)
-
+    }, 28);
     return () => {
       clearInterval(t);
       streamRef.current?.getTracks().forEach(tr => tr.stop());
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       audioRef.current?.pause();
       if (recTimeoutRef.current) clearTimeout(recTimeoutRef.current);
-      if (thinkingAudioRef.current) {
-        thinkingAudioRef.current.pause();
-        thinkingAudioRef.current.currentTime = 0;
-      }
     };
   }, []);
 
-  /* ── MİKROFON ─────────────────────────────────────── */
+  // ─── MICROPHONE ──────────────────────────────────────────────
   const initAudio = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       streamRef.current = stream;
-      if (!hasGreetedRef.current) { hasGreetedRef.current = true; setTimeout(greet, 600); }
+      if (!hasGreetedRef.current) { hasGreetedRef.current = true; setTimeout(greet, 900); }
     } catch {
-      setError('Mikrofon erişimi reddedildi');
+      setError('Mikrofon erişimi reddedildi. Lütfen izin ver!');
     }
   };
 
   const greet = async () => {
-    const msgs = [
-      'Sistem devrede. Nasıl yardımcı olabilirim?',
-      'Hazırım. Ne yapıyoruz?',
-      'Seni dinliyorum.',
-      'Ben geldim. Nasılsın?'
+    const opts = [
+      'Merhaba! Ben BALKIZ. Seninle konuşmaya hazırım!',
+      'Selam! Bugün nasılsın? Sana yardım etmek için buradayım!',
+      'Hoş geldin! Seni dinliyorum, ne öğrenmek istersin?',
+      'Merhaba! Hazırım, haydi konuşalım!',
+      'Hey! Ben BALKIZ. Bana istediğini sorabilirsin!',
     ];
-    const g = msgs[Math.floor(Math.random() * msgs.length)];
+    const g = opts[Math.floor(Math.random() * opts.length)];
     setResponse(g);
     await speak(g);
   };
 
-  /* ── VİZÜALİZASYON ────────────────────────────────── */
+  // ─── VISUALIZER ──────────────────────────────────────────────
   const startViz = () => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     let ph = 0;
@@ -105,55 +193,53 @@ Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermem
     };
     loop();
   };
-
   const stopViz = () => {
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
     setAudioLevel(0);
   };
 
-  /* ── DİNLEME ──────────────────────────────────────── */
+  // ─── RECORDING ───────────────────────────────────────────────
   const startListening = async () => {
-    if (!streamRef.current || status !== 'idle') return;
+    if (!streamRef.current || statusRef.current !== 'idle') return;
     audioChunksRef.current = [];
+    setError('');
     try {
       const mr = new MediaRecorder(streamRef.current, { mimeType: 'audio/webm;codecs=opus' });
       mediaRecorderRef.current = mr;
       mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        if (blob.size < 3000) { setStatus('idle'); return; }
+        if (blob.size < 3000) { setStatusBoth('idle'); return; }
         await transcribe(blob);
       };
       mr.start();
-      setStatus('listening');
+      setStatusBoth('listening');
       startViz();
-      recTimeoutRef.current = setTimeout(stopListening, 8000);
+      sfx.start();
+      recTimeoutRef.current = setTimeout(stopListening, 10000);
     } catch {
       setError('Dinleme başlatılamadı');
     }
   };
 
   const stopListening = () => {
-    if (mediaRecorderRef.current && status === 'listening') {
+    if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
-      setStatus('processing');
+      setStatusBoth('processing');
       stopViz();
-      if (recTimeoutRef.current) {
-        clearTimeout(recTimeoutRef.current);
-        recTimeoutRef.current = null;
-      }
-      // Düşünme sesi çal
-      thinkingAudioRef.current?.play();
+      sfx.stop();
+      if (recTimeoutRef.current) { clearTimeout(recTimeoutRef.current); recTimeoutRef.current = null; }
     }
   };
 
-  const toggle = () => status === 'listening' ? stopListening() : startListening();
+  const toggle = () => {
+    if (statusRef.current === 'listening') stopListening();
+    else if (statusRef.current === 'idle') startListening();
+  };
 
-  /* ── TRANSKRİPSİYON ───────────────────────────────── */
+  // ─── TRANSCRIPTION ───────────────────────────────────────────
   const transcribe = async (blob: Blob) => {
+    sfx.thinking();
     try {
       const fd = new FormData();
       fd.append('file', blob, 'audio.webm');
@@ -164,35 +250,31 @@ Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermem
       const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${GROQ_KEY}` },
-        body: fd
+        body: fd,
       });
-      if (!r.ok) throw new Error(`${r.status}`);
-      const d    = await r.json();
-      const text = d.text?.trim() || '';
-      if (!text || text.length < 2) { setStatus('idle'); return; }
+      if (!r.ok) throw new Error(`Whisper ${r.status}`);
+      const d = await r.json();
+      const text = (d.text as string)?.trim() || '';
+      if (!text || text.length < 2) { setStatusBoth('idle'); return; }
       setTranscript(text);
       await handleSpeech(text);
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : 'Bilinmeyen hata';
-      setError('Ses tanıma başarısız: ' + errorMessage);
-      setStatus('idle');
-    } finally {
-      if (thinkingAudioRef.current) {
-        thinkingAudioRef.current.pause();
-        thinkingAudioRef.current.currentTime = 0;
-      }
+    } catch (e) {
+      console.error('Transcription error:', e);
+      sfx.error();
+      setError('Ses tanıma başarısız oldu. Tekrar dene!');
+      setStatusBoth('idle');
     }
   };
 
-  /* ── KONUŞMA İŞLEME ───────────────────────────────── */
+  // ─── SPEECH PIPELINE ─────────────────────────────────────────
   const handleSpeech = async (text: string) => {
     try {
       const ai = await getAI(text);
-      if (!ai) throw new Error('Yanıt alınamadı');
       setResponse(ai);
+      sfx.ready();
       await speak(ai);
     } catch {
-      const fb = 'Tekrar söyler misin?';
+      const fb = 'Üzgünüm, bir sorun çıktı. Tekrar dener misin?';
       setResponse(fb);
       await speak(fb);
     } finally {
@@ -200,463 +282,405 @@ Her zaman yanıt ver ve konuşmayı devam ettir. Sessiz kalma veya yanıt vermem
     }
   };
 
-  /* ── AI YANIT ─────────────────────────────────────── */
-  const getAI = async (msg: string): Promise<string> => {
-    const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...chatHistory.slice(-8),
-      { role: 'user', content: msg }
-    ];
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${GROQ_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 60,
-        temperature: 0.5,
-        top_p: 0.9,
-      })
-    });
-    if (!r.ok) throw new Error(`${r.status}`);
-    const d       = await r.json();
-    const out     = d.choices[0].message.content.trim()
-      .replace(/\*\*/g, '').replace(/\*/g, '').replace(/\n+/g, ' ').trim();
-    const trimmed = out.split(/\s+/).slice(0, 20).join(' ');
-    setChatHistory(prev => [
-      ...prev.slice(-8),
-      { role: 'user',      content: msg     },
-      { role: 'assistant', content: trimmed }
-    ]);
-    setMemPct(prev => Math.min(((prev / 100 * 16 + 2) / 16) * 100, 100));
-    return trimmed;
+  // ─── AI RESPONSE (with retry) ────────────────────────────────
+  const getAI = async (msg: string, attempt = 0): Promise<string> => {
+    try {
+      const messages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...chatHistory.slice(-10),
+        { role: 'user', content: msg },
+      ];
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROQ_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages,
+          max_tokens: 80,
+          temperature: 0.75,
+          top_p: 0.9,
+        }),
+      });
+      if (!r.ok) throw new Error(`AI ${r.status}`);
+      const d   = await r.json();
+      const raw = (d.choices?.[0]?.message?.content as string)?.trim() || '';
+      // Empty response → retry up to 2 times
+      if (!raw && attempt < 2) { await delay(400); return getAI(msg, attempt + 1); }
+      const clean   = raw.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\n+/g, ' ').trim();
+      const trimmed = clean.split(/\s+/).slice(0, 30).join(' ');
+      setChatHistory(prev => [
+        ...prev.slice(-10),
+        { role: 'user',      content: msg     },
+        { role: 'assistant', content: trimmed },
+      ]);
+      setMemPct(prev => Math.min(((prev / 100 * 16 + 2) / 16) * 100, 100));
+      return trimmed || 'Hmm, ne diyeceğimi bilemedim. Tekrar sorar mısın?';
+    } catch (e) {
+      if (attempt < 2) { await delay(600); return getAI(msg, attempt + 1); }
+      throw e;
+    }
   };
 
-  /* ── SES SENTEZ ───────────────────────────────────── */
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  // ─── TEXT-TO-SPEECH ──────────────────────────────────────────
+  // 1) ElevenLabs regular endpoint (not /stream — avoids 402 on lower plans)
+  // 2) Browser SpeechSynthesis fallback
   const speak = async (text: string): Promise<void> => {
-    setStatus('speaking');
-    setSpeakKey(k => k + 1);
-    setShowSmoke(true);
-    setTimeout(() => setShowSmoke(false), 1400);
+    setStatusBoth('speaking');
+    setGenieKey(k => k + 1);   // triggers genie CSS animation
     startViz();
-    try {
-      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          'xi-api-key': EL_KEY 
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { 
-            stability: 0.8, // Daha stabil hale getirildi
-            similarity_boost: 0.85, // FRIDAY benzeri sakinlik için artırıldı
-            style: 0.2 // Daha az robotik, doğal ton
+
+    // ── Try ElevenLabs ──
+    if (EL_KEY) {
+      try {
+        const r = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'xi-api-key': EL_KEY },
+            body: JSON.stringify({
+              text,
+              model_id: 'eleven_multilingual_v2',
+              voice_settings: {
+                stability: 0.72,
+                similarity_boost: 0.85,
+                style: 0.28,
+                use_speaker_boost: true,
+              },
+            }),
           }
-        })
-      });
-      if (!r.ok) {
-        if (r.status === 402) {
-          setError('ElevenLabs kredileri yetersiz veya limit aşıldı. Lütfen hesabınızı kontrol edin.');
+        );
+        if (r.ok) {
+          const blob = await r.blob();
+          const url  = URL.createObjectURL(blob);
+          if (!audioRef.current) audioRef.current = new Audio();
+          audioRef.current.src = url;
+          return new Promise<void>(resolve => {
+            const done = () => { URL.revokeObjectURL(url); setStatusBoth('idle'); stopViz(); resolve(); };
+            audioRef.current!.onended = done;
+            audioRef.current!.onerror = done;
+            audioRef.current!.play().catch(done);
+          });
         }
-        throw new Error(`${r.status}`);
-      }
-      const blob = await r.blob();
-      const url  = URL.createObjectURL(blob);
-      if (!audioRef.current) audioRef.current = new Audio();
-      audioRef.current.src     = url;
-      audioRef.current.onended = () => { URL.revokeObjectURL(url); setStatus('idle'); stopViz(); };
-      audioRef.current.onerror = () => { URL.revokeObjectURL(url); setStatus('idle'); stopViz(); setError('Ses çalma hatası'); };
-      await audioRef.current.play();
-    } catch {
-      setStatus('idle');
-      stopViz();
+        // 402 / 403 / 429 → fall through to browser TTS
+      } catch { /* fall through */ }
     }
+
+    // ── Browser SpeechSynthesis fallback ──
+    return new Promise<void>(resolve => {
+      window.speechSynthesis.cancel();
+      const utt    = new SpeechSynthesisUtterance(text);
+      utt.lang     = 'tr-TR';
+      utt.rate     = 0.90;
+      utt.pitch    = 1.15;   // slightly higher = warmer, less robotic
+      utt.volume   = 0.95;
+
+      const tryVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const trFem  = voices.find(v => v.lang.startsWith('tr') && /female|kadın/i.test(v.name));
+        const trAny  = voices.find(v => v.lang.startsWith('tr'));
+        if (trFem) utt.voice = trFem;
+        else if (trAny) utt.voice = trAny;
+      };
+
+      if (window.speechSynthesis.getVoices().length) tryVoice();
+      else window.speechSynthesis.onvoiceschanged = tryVoice;
+
+      const done = () => { setStatusBoth('idle'); stopViz(); resolve(); };
+      utt.onend  = done;
+      utt.onerror = done;
+      window.speechSynthesis.speak(utt);
+    });
   };
 
   const stopSpeaking = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    setStatus('idle');
+    audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.currentTime = 0;
+    window.speechSynthesis.cancel();
+    setStatusBoth('idle');
     stopViz();
   };
 
-  /* ── RENK PALETİ ──────────────────────────────────── */
+  // ─── COLOUR PALETTE ──────────────────────────────────────────
   const palette = {
-    idle:       { smoke: 'rgba(0,212,255,0.5)',  glow: '#00d4ff' },
-    listening:  { smoke: 'rgba(255,60,60,0.6)',  glow: '#ff3c3c' },
-    processing: { smoke: 'rgba(200,255,0,0.5)',  glow: '#c8ff00' },
-    speaking:   { smoke: 'rgba(188,19,254,0.5)', glow: '#bc13fe' },
-  };
+    idle:       { main: '#00d4ff', glow: '#00d4ff' },
+    listening:  { main: '#ff4757', glow: '#ff4757' },
+    processing: { main: '#ffd32a', glow: '#ffd32a' },
+    speaking:   { main: '#7bed9f', glow: '#7bed9f' },
+  } as const;
   const col      = palette[status];
-  const orbScale = 1 + audioLevel * 0.35;
+  const orbScale = 1 + audioLevel * 0.28;
 
-  /* ── BOOT EKRANI ──────────────────────────────────── */
+  const statusLabel: Record<Status, string> = {
+    idle:       '✨ Hazırım!',
+    listening:  '🎤 Seni Dinliyorum...',
+    processing: '🤔 Düşünüyorum...',
+    speaking:   '💬 Konuşuyorum!',
+  };
+
+  // ─── BOOT SCREEN ─────────────────────────────────────────────
   if (!booted) return (
-    <div className="boot child-friendly">
-      <div className="hud-bg" />
-      <div className="hud-grid" />
-      <div className="boot-ring-wrap">
-        <div className="boot-ring boot-ring-1" />
-        <div className="boot-ring boot-ring-2" />
-        <div className="boot-ring boot-ring-3" />
+    <div className="boot">
+      <div className="boot-bg" /><div className="boot-grid" />
+      <div className="boot-rings">
+        {[1,2,3].map(n => <div key={n} className={`boot-ring br${n}`} />)}
         <div className="boot-core">B</div>
       </div>
       <div className="boot-title">B.A.L.K.I.Z</div>
-      <div className="boot-sub">BİONİK YAPAY ZEKA · vEarly.1</div>
+      <div className="boot-sub">Bionic Artificial Language &amp; Knowledge Intelligence</div>
       <div className="boot-bar-wrap">
         <div className="boot-bar" style={{ width: `${bootProgress}%` }} />
+        <div className="boot-bar-glow" style={{ width: `${bootProgress}%` }} />
       </div>
-      <div className="boot-pct">SİSTEM BAŞLATILIYOR... {Math.floor(bootProgress)}%</div>
+      <div className="boot-pct">Sistem Başlatılıyor... {Math.floor(bootProgress)}%</div>
       <div className="boot-modules">
         {[
-          { label: 'NEURAL CORE', icon: <Cpu    size={10} />, threshold: 20 },
-          { label: 'SES MODÜLÜ',  icon: <Radio  size={10} />, threshold: 45 },
-          { label: 'YAPAY ZEKA',  icon: <Zap    size={10} />, threshold: 65 },
-          { label: 'GÜVENLİK',    icon: <Shield size={10} />, threshold: 85 },
+          { label: '🧠 Yapay Zeka Çekirdeği', at: 20, icon: <Cpu    size={11}/> },
+          { label: '🎤 Ses Modülü',            at: 45, icon: <Radio  size={11}/> },
+          { label: '⚡ Öğrenme Sistemi',       at: 65, icon: <Zap    size={11}/> },
+          { label: '🛡️ Güvenlik Katmanı',      at: 85, icon: <Shield size={11}/> },
         ].map(m => (
-          <div key={m.label} className={`boot-mod ${bootProgress > m.threshold ? 'on' : ''}`}>
-            <div className="boot-mod-dot" />
-            {m.icon} {m.label}
+          <div key={m.label} className={`boot-mod ${bootProgress > m.at ? 'on' : ''}`}>
+            <div className="boot-mod-dot" />{m.icon} {m.label}
           </div>
         ))}
       </div>
     </div>
   );
 
-  /* ── ANA UYGULAMA ─────────────────────────────────── */
+  // ─── MAIN APP ────────────────────────────────────────────────
   return (
-    <>
-      <div className="hud-bg child-bg" /> {/* Çocuk dostu arka plan */}
-      <div className="hud-grid" />
-      <div className="hud-scan" />
-      <div className="corner corner-tl" />
-      <div className="corner corner-tr" />
-      <div className="corner corner-bl" />
-      <div className="corner corner-br" />
+    <div className="app">
+      <div className="app-bg" /><div className="app-grid" /><div className="scan-line" />
+      <div className="corner c-tl"/><div className="corner c-tr"/>
+      <div className="corner c-bl"/><div className="corner c-br"/>
 
-      <div className="app child-friendly"> {/* Çocuk dostu stiller ekle */}
-
-        {/* ── HEADER ──────────────────────────────────── */}
-        <header className="hud-header">
-          <div className="hud-header-left">
-            <span className="hud-logo-text">B.A.L.K.I.Z</span>
-            <div className="hud-divider" />
-            <span className="hud-sub-text">BİONİK YAPAY ZEKA · v2</span>
+      {/* HEADER */}
+      <header className="hdr">
+        <div className="hdr-brand">
+          <span className="hdr-name">B.A.L.K.I.Z</span>
+          <span className="hdr-sub">Türkçe Yapay Zeka · v2</span>
+        </div>
+        <div className="hdr-stats">
+          {[
+            { l: 'Model',  v: 'LLaMA 3.3 70B' },
+            { l: 'Ses',    v: 'Çok Dilli'       },
+            { l: 'Hafıza', v: `${(chatHistory.length/2)|0} / 8 tur` },
+          ].map(s => (
+            <div key={s.l} className="hdr-stat">
+              <span className="stat-l">{s.l}</span>
+              <span className="stat-v">{s.v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="hdr-right">
+          <div className={`status-badge s-${status}`}>
+            <div className={`badge-dot ${status !== 'idle' ? 'pulse' : ''}`} />
+            {statusLabel[status]}
           </div>
+          <img src={ilkyarLogo} alt="İlkyar" className="hdr-logo" />
+        </div>
+      </header>
 
-          <div className="hud-header-center">
+      {/* BODY */}
+      <div className="body">
+
+        {/* LEFT PANEL */}
+        <aside className="panel panel-l">
+          <div className="card">
+            <div className="card-title"><span className="card-dot"/>⚡ Sistem Durumu</div>
             {[
-              { label: 'MODEL',  val: '3.3 70B Parametre'                   },
-              { label: 'SES',    val: 'SES1'                        },
-              { label: 'HAFIZA', val: `${(chatHistory.length / 2) | 0} / 8` },
-            ].map(s => (
-              <div key={s.label} className="hud-stat">
-                <span className="hud-stat-label">{s.label}</span>
-                <span className="hud-stat-val">{s.val}</span>
+              ['Yapay Zeka','Aktif','green'],
+              ['Ses Motoru','Hazır','green'],
+              ['Bağlantı','Güçlü','green'],
+              ['Mikrofon', streamRef.current ? 'Açık' : 'Kapalı', streamRef.current ? 'green':'red'],
+            ].map(([k,v,c])=>(
+              <div key={k} className="row">
+                <span className="row-k">{k}</span>
+                <span className={`row-v ${c}`}>{v}</span>
               </div>
             ))}
           </div>
 
-          <div className="hud-header-right">
-            <div className={`hud-status-badge ${status}`}>
-              <div className={`badge-dot ${status !== 'idle' ? 'pulse' : ''}`} />
-              {status === 'idle'        ? 'HAZIR'
-               : status === 'listening' ? 'DİNLİYOR'
-               : status === 'processing'? 'DÜŞÜNÜYOR'
-               :                          'KONUŞUYOR'}
-            </div>
-            <img src={ilkyarLogo} alt="İlkyar" className="hud-logo-img" />
-          </div>
-        </header>
-
-        {/* ── SOL PANEL ───────────────────────────────── */}
-        <aside className="panel-left">
-          <div className="panel-block">
-            <div className="panel-title">
-              <div className="panel-title-dot" /> SİSTEM DURUMU
-            </div>
-            {[
-              { k: 'Neural Core',  v: 'AKTİF',  cls: 'green' },
-              { k: 'Ses Modülü',   v: 'HAZIR',  cls: 'green' },
-              { k: 'AI Çekirdeği', v: 'ONLINE', cls: 'green' },
-              { k: 'Bağlantı',     v: 'GÜÇLÜ',  cls: 'green' },
-            ].map(row => (
-              <div key={row.k} className="panel-row">
-                <span>{row.k}</span>
-                <span className={`panel-row-val ${row.cls}`}>{row.v}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="panel-block">
-            <div className="panel-title">
-              <div className="panel-title-dot" /> SES SEVİYESİ
-            </div>
-            <div className="vert-lines">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="vert-line"
+          <div className="card">
+            <div className="card-title"><span className="card-dot"/>🎵 Ses Seviyesi</div>
+            <div className="vert-bars">
+              {Array.from({length:10}).map((_,i)=>(
+                <div key={i} className="vbar"
                   style={{
-                    animationDelay:    `${i * 0.12}s`,
-                    animationDuration: `${1.2 + (i % 3) * 0.4}s`,
-                    background:
-                      status === 'listening'
-                        ? 'rgba(255,60,60,0.5)'
-                        : status === 'speaking'
-                        ? `rgba(0,212,255,${0.3 + audioLevel * 0.5})`
-                        : 'rgba(0,212,255,0.2)',
-                    height:
-                      status !== 'idle'
-                        ? `${20 + audioLevel * 80 * Math.abs(Math.sin(i * 0.8))}%`
-                        : '15%',
+                    height: status!=='idle'
+                      ? `${14+audioLevel*86*Math.abs(Math.sin(i*0.9))}%`
+                      : '12%',
+                    background: col.main,
+                    opacity: status!=='idle' ? 0.7+audioLevel*0.3 : 0.2,
+                    animationDelay: `${i*0.1}s`,
                   }}
                 />
               ))}
             </div>
           </div>
 
-          <div className="panel-block">
-            <div className="panel-title">
-              <div className="panel-title-dot" /> KAYNAKLAR
-            </div>
-            {[
-              { label: 'İŞLEMCİ', pct: 42     },
-              { label: 'BELLEK',  pct: memPct  },
-              { label: 'AĞ',      pct: 88      },
-            ].map(b => (
-              <div key={b.label}>
-                <div className="panel-row">
-                  <span>{b.label}</span>
-                  <span className="panel-row-val">{Math.round(b.pct)}%</span>
+          <div className="card">
+            <div className="card-title"><span className="card-dot"/>📊 Kaynaklar</div>
+            {[['İşlemci',42],['Hafıza',memPct],['Ağ',88]].map(([l,p])=>(
+              <div key={l}>
+                <div className="row">
+                  <span className="row-k">{l}</span>
+                  <span className="row-v cyan">{Math.round(p as number)}%</span>
                 </div>
-                <div className="mini-bar-wrap">
-                  <div className="mini-bar" style={{ width: `${b.pct}%` }} />
+                <div className="minibar">
+                  <div className="minibar-fill" style={{width:`${p}%`, background:col.main}} />
                 </div>
               </div>
             ))}
           </div>
         </aside>
 
-        {/* ── MERKEZ ──────────────────────────────────── */}
+        {/* CENTER STAGE */}
         <main className="center">
-          <div className="hud-line hud-line-1" />
-          <div className="hud-line hud-line-2" />
-          <div className="hud-circle hud-circle-1" />
-          <div className="hud-circle hud-circle-2" />
+          {/* JARVIS ORB + ORBITING DOTS */}
+          <div className="orb-scene">
+            <OrbitRing radius={175} count={12} duration={22} color={col.main} dotSize={3} pulsing/>
+            <OrbitRing radius={145} count={6}  duration={9}  color={col.main} dotSize={5} reverse/>
+            <OrbitRing radius={115} count={4}  duration={6}  color={col.main} dotSize={7} />
 
-          {/* ── JARVIS-like Rolling Circle with Dots ────── */}
-          <div className="jarvis-spinner" style={{ display: status === 'processing' ? 'block' : 'none' }}>
-            <div className="spinner-circle">
-              <div className="dot dot1"></div>
-              <div className="dot dot2"></div>
-              <div className="dot dot3"></div>
-              <div className="dot dot4"></div>
-              <div className="dot dot5"></div>
-              <div className="dot dot6"></div>
-            </div>
-          </div>
+            {/* Halo glow */}
+            <div className="orb-halo" style={{boxShadow:`0 0 80px 20px ${col.glow}28`}} />
 
-          {/* ── ORB (Çocuk dostu hale getirildi) ────────── */}
-          <div
-            className="orb-wrap"
-            style={{ cursor: status === 'processing' ? 'wait' : 'pointer' }}
-            onClick={status === 'speaking' ? undefined : toggle}
-          >
-            {/* Cin dumanı */}
-            {showSmoke && (
-              <div className="genie-smoke">
-                <div className="smoke-col smoke-l" style={{ background: col.smoke }} />
-                <div className="smoke-col smoke-r" style={{ background: col.smoke }} />
-                <div className="smoke-col smoke-c" style={{ background: col.smoke }} />
-              </div>
-            )}
-
-            {/* Dış halo */}
+            {/* Main orb – genie key triggers CSS re-animation */}
             <div
-              className="orb-halo"
-              style={{
-                background:
-                  status === 'idle'
-                    ? 'radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 70%)'
-                    : `radial-gradient(circle, ${col.smoke.replace(/[\d.]+(?=\))/, '0.18')} 0%, transparent 70%)`,
-              }}
-            />
-
-            {/* Dönen halkalar */}
-            <div className={`orb-ring-outer ${status !== 'idle' ? 'active' : ''} ${status === 'listening' ? 'listening' : ''}`} />
-            <div className={`orb-ring-spin ${status}`} />
-
-            {/* BLOB BODY */}
-            <div
-              key={speakKey}
-              className={`orb-body ${status} ${speakKey > 0 && status === 'speaking' ? 'genie-enter' : ''}`}
-              style={
-                status === 'speaking'
-                  ? { transform: `scale(${orbScale})` }
-                  : undefined
-              }
+              key={genieKey}
+              className={`orb orb-${status}${genieKey>0 ? ' genie-in':''}`}
+              style={{ transform:`scale(${orbScale})` }}
+              onClick={status === 'speaking' ? undefined : toggle}
             >
-              <div className={`orb-blob orb-blob-1 ${status}`} />
-              <div className={`orb-blob orb-blob-2 ${status}`} />
-              <div className={`orb-blob orb-blob-3 ${status}`} />
-
+              <div className="blob b1" style={{background:`radial-gradient(circle at 30% 30%, ${col.main}99, transparent 70%)`}} />
+              <div className="blob b2" style={{background:`radial-gradient(circle at 70% 65%, ${col.main}55, transparent 70%)`}} />
+              <div className="blob b3" />
               <div className="orb-icon">
-                {status === 'processing' ? (
-                  <Activity size={36} style={{ animation: 'spin 1.2s linear infinite' }} />
-                ) : status === 'speaking' ? (
-                  <Volume2 size={36} />
-                ) : (
-                  <Mic size={36} />
-                )}
+                {status==='processing' ? <Activity size={42} className="spin-anim"/>
+                 : status==='speaking' ? <Volume2  size={42} className="breathe-anim"/>
+                 : status==='listening'? <Mic      size={42} className="pulse-anim"/>
+                 :                       <Mic      size={42}/>}
               </div>
             </div>
+
+            <div className="orb-label" style={{color:col.main}}>{statusLabel[status]}</div>
           </div>
 
-          {/* Dalga formu (Çocuklar için daha renkli hale getirildi) */}
-          <div className="waveform colorful-wave">
-            {Array.from({ length: 36 }).map((_, i) => {
-              const active = status === 'listening' || status === 'speaking';
+          {/* WAVEFORM */}
+          <div className="waveform">
+            {Array.from({length:40}).map((_,i)=>{
+              const active = status==='listening'||status==='speaking';
               const h = active
-                ? Math.abs(Math.sin((i / 36) * Math.PI * 5 + audioLevel * 6)) * audioLevel * 36 + 3
-                : 3;
+                ? Math.abs(Math.sin((i/40)*Math.PI*6 + audioLevel*8))*audioLevel*42+4 : 4;
               return (
-                <div
-                  key={i}
-                  className="wave-bar"
+                <div key={i} className="wbar"
                   style={{
-                    height:    h,
-                    background:
-                      status === 'listening'
-                        ? `rgba(255,60,60,${0.4 + audioLevel * 0.5})`
-                        : `linear-gradient(to top, #ff3c3c, #00d4ff)`, // Renkli gradyan
-                    boxShadow: active ? `0 0 4px ${col.glow}66` : 'none',
+                    height: h,
+                    background: col.main,
+                    opacity: active ? 0.35+audioLevel*0.55 : 0.12,
+                    boxShadow: active ? `0 0 5px ${col.glow}99`:undefined,
                   }}
                 />
               );
             })}
           </div>
 
-          {/* Mesaj alanı (Daha okunaklı font ve renkler) */}
-          <div className="msg-area readable-font">
+          {/* MESSAGE BUBBLES */}
+          <div className="msg-area">
             {error && (
-              <div
-                className="msg-bubble ai error-bubble"
-                style={{ borderLeftColor: 'rgba(255,60,60,0.5)', color: 'rgba(255,120,120,0.8)' }}
-              >
-                <span className="msg-label">SİSTEM</span>⚠️ {error}
+              <div className="bubble bubble-err">
+                <span className="bubble-lbl">⚠️ Sistem</span>
+                <p>{error}</p>
               </div>
             )}
             {transcript && (
-              <div className="msg-bubble user">
-                <span className="msg-label">SEN</span>{transcript}
+              <div className="bubble bubble-user">
+                <span className="bubble-lbl">🧒 Sen</span>
+                <p>{transcript}</p>
               </div>
             )}
             {response && (
-              <div className="msg-bubble ai">
-                <span className="msg-label">B.A.L.K.I.Z</span>{response}
+              <div className="bubble bubble-ai">
+                <span className="bubble-lbl">🤖 BALKIZ</span>
+                <p>{response}</p>
               </div>
             )}
           </div>
 
-          {/* Mikrofon butonu */}
+          {/* MIC BUTTON */}
           <button
-            className={`mic-btn ${status === 'listening' ? 'listening' : ''}`}
+            className={`mic-btn${status==='listening'?' rec':''}`}
+            style={{
+              borderColor: col.main,
+              color: col.main,
+              boxShadow: status!=='idle' ? `0 0 22px ${col.glow}66` : undefined,
+            }}
             onClick={toggle}
-            disabled={status === 'processing' || status === 'speaking'}
-            title={status === 'listening' ? 'Durdur' : 'Konuş'}
+            disabled={status==='processing'||status==='speaking'}
           >
-            {status === 'listening' ? <VolumeX size={20} /> : <Mic size={20} />}
+            {status==='listening'
+              ? <><VolumeX size={20}/> Durdur</>
+              : <><Mic size={20}/> Konuş</>}
           </button>
 
-          {/* Dur butonu */}
-          {status === 'speaking' && (
+          {status==='speaking' && (
             <button className="stop-btn" onClick={stopSpeaking}>
-              <VolumeX size={12} /> BEKLE
+              <VolumeX size={13}/> Sustur
             </button>
           )}
         </main>
 
-        {/* ── SAĞ PANEL ───────────────────────────────── */}
-        <aside className="panel-right">
-          <div className="panel-block">
-            <div className="panel-title">
-              <div className="panel-title-dot" /> KONUŞMA GÜNLÜĞÜ
-            </div>
-            {chatHistory.length === 0 ? (
-              <div style={{ fontSize: '0.6rem', color: 'rgba(0,212,255,0.3)', padding: '0.3rem 0' }}>
-                Henüz konuşma yok...
-              </div>
-            ) : (
-              chatHistory.slice(-6).map((m, i) => (
-                <div key={i} className={`log-item ${m.role === 'user' ? 'user' : 'ai'}`}>
-                  <span className="log-role">{m.role === 'user' ? 'SEN' : 'B.A.L.K.I.Z'}</span>
-                  <span className="log-text">{m.content}</span>
+        {/* RIGHT PANEL */}
+        <aside className="panel panel-r">
+          <div className="card">
+            <div className="card-title"><span className="card-dot"/>💬 Konuşma Geçmişi</div>
+            {chatHistory.length===0
+              ? <p className="empty-log">Henüz konuşma yok...</p>
+              : chatHistory.slice(-8).map((m,i)=>(
+                <div key={i} className={`log-entry le-${m.role}`}>
+                  <span className="log-who">{m.role==='user'?'🧒 Sen':'🤖 BALKIZ'}</span>
+                  <span className="log-txt">{m.content}</span>
                 </div>
               ))
-            )}
+            }
           </div>
 
-          <div className="panel-block">
-            <div className="panel-title">
-              <div className="panel-title-dot" /> HAFIZA
-            </div>
-            <div className="panel-row">
-              <span>Mesaj sayısı</span>
-              <span className="panel-row-val">{chatHistory.length}</span>
-            </div>
-            <div className="panel-row">
-              <span>Kapasite</span>
-              <span className="panel-row-val">16 mesaj</span>
-            </div>
-            <div className="mini-bar-wrap" style={{ marginTop: '0.3rem' }}>
-              <div className="mini-bar" style={{ width: `${memPct}%` }} />
-            </div>
+          <div className="card">
+            <div className="card-title"><span className="card-dot"/>🧠 Hafıza</div>
+            <div className="row"><span className="row-k">Mesaj Sayısı</span><span className="row-v cyan">{chatHistory.length}</span></div>
+            <div className="row"><span className="row-k">Kapasite</span><span className="row-v">16 mesaj</span></div>
+            <div className="minibar"><div className="minibar-fill" style={{width:`${memPct}%`,background:col.main}}/></div>
           </div>
 
-          <div className="panel-block">
-            <div className="panel-title">
-              <div className="panel-title-dot" /> OTURUM BİLGİSİ
+          <div className="card">
+            <div className="card-title"><span className="card-dot"/>📋 Oturum</div>
+            <div className="row"><span className="row-k">Toplam Tur</span><span className="row-v cyan">{(chatHistory.length/2)|0}</span></div>
+            <div className="row"><span className="row-k">Durum</span>
+              <span className={`row-v ${status==='idle'?'green':'yellow'}`}>{statusLabel[status]}</span>
             </div>
-            <div className="panel-row">
-              <span>Toplam tur</span>
-              <span className="panel-row-val">{(chatHistory.length / 2) | 0}</span>
-            </div>
-            <div className="panel-row">
-              <span>Durum</span>
-              <span className={`panel-row-val ${status === 'idle' ? 'green' : 'yellow'}`}>
-                {status === 'idle'        ? 'BEKLEMEDE'
-                 : status === 'listening' ? 'DİNLİYOR'
-                 : status === 'processing'? 'İŞLİYOR'
-                 :                          'KONUŞUYOR'}
-              </span>
-            </div>
-            <div className="panel-row">
-              <span>Ses motoru</span>
-              <span className="panel-row-val green">AKTİF</span>
-            </div>
+            <div className="row"><span className="row-k">Ses Motoru</span><span className="row-v green">AKTİF</span></div>
           </div>
         </aside>
 
-        {/* ── FOOTER ──────────────────────────────────── */}
-        <footer className="hud-footer">
-          <span className="footer-text">
-            balkiz yanıtlarını araştır, sorgula, geliştir. geri bildirimlerinle bu yapay zekayı daha iyi hale getirebilirsin. iletişim: <a href="mailto:simseklermustafaberke@gmail.com">simseklermustafaberke@gmail.com</a>
-          </span>
-          <div className="footer-dots">
-            <div className={`footer-dot ${status !== 'idle' ? 'on' : ''}`} />
-            <div className={`footer-dot ${status === 'speaking' || status === 'processing' ? 'on' : ''}`} />
-            <div className={`footer-dot ${status === 'speaking' ? 'on' : ''}`} />
-          </div>
-          <span className="footer-text">Mustafa Berke Şimşekler © 2025</span>
-        </footer>
+      </div>{/* /body */}
 
-      </div>
-    </>
+      {/* FOOTER */}
+      <footer className="ftr">
+        <span className="ftr-txt">
+          BALKIZ'ı sorgula, geliştir, büyüt.{' '}
+          <a href="mailto:simseklermustafaberke@gmail.com">simseklermustafaberke@gmail.com</a>
+        </span>
+        <div className="ftr-dots">
+          {[status!=='idle', status==='speaking'||status==='processing', status==='speaking'].map((on,i)=>(
+            <div key={i} className={`fdot ${on?'on':''}`}/>
+          ))}
+        </div>
+        <span className="ftr-txt">Mustafa Berke Şimşekler © 2025</span>
+      </footer>
+    </div>
   );
 };
 
