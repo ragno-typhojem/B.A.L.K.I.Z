@@ -1,57 +1,58 @@
-# 🎬 B.A.L.K.I.Z - Bionic AI Assistant
-Bilim Araştırmacısı Logik Kadın İnovatif Zekâ
-Türkçe ses tanıma ve yapay zeka destekli, futuristik arayüzlü bir AI asistanı.
+# B.A.L.K.I.Z - Bionic AI Assistant
 
-## ✨ Özellikler
+Bilim Araştırmacısı Logik Kadın İnovatif Zeka.
+Çocukların kolay kullanabilmesi için hazırlanmış Türkçe sesli yapay zeka asistanı.
 
-- 🎨 **Futuristik Arayüz** - Animasyonlu orbital halkalar, waveform görselleştirme
-- 🎤 **Gerçek Zamanlı Türkçe Ses Tanıma** - Web Speech API
-- 🤖 **Groq API Entegrasyonu** - Llama 3.1 70B modeli
-- 🔊 **ElevenLabs TTS**
-- 📊 **Sistem Panelleri** - Durum göstergeleri ve aktivite günlüğü
+## Neler Güncellendi?
 
-## 🚀 Hızlı Başlangıç
+- Daha sade, çocuk dostu ve futuristik ana ekran.
+- Tek ana aksiyon: konuşma butonu, hızlı soru butonları ve yazı ile sorma alanı.
+- Web Speech API ile canlı Türkçe algılama; desteklenmeyen tarayıcıda Groq Whisper kayıt yedeği.
+- Groq ve ElevenLabs anahtarları artık tarayıcı kodunda değil, Vercel API fonksiyonlarında.
+- ElevenLabs yoksa otomatik olarak tarayıcının Türkçe seslendirmesine düşer.
+- Mobil ve masaüstü için taşmayı azaltan responsive düzen.
+- Logo alanları: `VITE_BALKIZ_LOGO_URL` ve `VITE_PARTNER_LOGO_URL`.
+
+## Kurulum
 
 ```bash
-# Kurulum
 npm install
-
-# Geliştirme
 npm run dev
+```
 
-# Production build
+Sadece arayüzü görmek için `npm run dev` yeterlidir. Sesli AI akışını yerelde API fonksiyonlarıyla birlikte denemek için Vercel CLI ile şunu kullan:
+
+```bash
+npm run dev:vercel
+```
+
+## Vercel Ortam Değişkenleri
+
+Vercel Project Settings > Environment Variables bölümüne ekle:
+
+```bash
+GROQ_API_KEY=your_groq_api_key_here
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+ELEVENLABS_VOICE_ID=XB0fDUnXU5powFXDhCwa
+VITE_BALKIZ_LOGO_URL=
+VITE_PARTNER_LOGO_URL=
+```
+
+`ELEVENLABS_API_KEY` boş bırakılırsa uygulama yine çalışır; seslendirme tarayıcı üzerinden yapılır.
+
+## Komutlar
+
+```bash
+npm run dev
+npm run dev:vercel
 npm run build
+npm run preview
 ```
 
-## 🔧 Yapılandırma
+## Deploy
 
-Kullandığınız github env ortamında, (bizimki netlify) API anahtarlarınızı güncelleyin:
+Vercel için ek ayar gerekmiyor. Bu repo Vite frontend ve `api/*.ts` serverless fonksiyonlarıyla hazırdır.
 
-```typescript
-const GROQ_API_KEY = 'your_groq_api_key_here';
-const ELEVENLABS_API_KEY = 'your_elevenlabs_api_key_here';
-```
+## Not
 
-## 📦 Teknoloji Stack'i
-
-- React 18 + TypeScript
-- Vite
-- Web Speech API
-- Groq API (LLM)
-- ElevenLabs API (TTS)
-- Lucide React (İkonlar)
-
-## 📱 Kullanım
-
-1. Sayfayı aç → Boot animasyonu başlar
-2. Merkez butona tıkla → Dinlemeye başla
-3. Türkçe konuş → AI yanıt verir
-4. Sağ üstten ses seç → Farklı sesler
-
-## 📄 Lisans
-
-MIT Lisansı
-
----
-
-**⭐ Katkı Sağla -- Geliştiriciye geri dönüş ver.**
+Mikrofon özelliği için site HTTPS üzerinde çalışmalıdır. Vercel deploy sonrası bu otomatik sağlanır.
