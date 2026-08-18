@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">BALKIZ low-poly hologram logo</title>
+  <desc id="desc">A sharp low-poly holographic B monogram with orbital facets.</desc>
+  <defs>
+    <linearGradient id="cyan" x1="72" y1="72" x2="438" y2="444" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9FCFF"/>
+      <stop offset=".28" stop-color="#42E8FF"/>
+      <stop offset=".62" stop-color="#42FFBC"/>
+      <stop offset="1" stop-color="#FFDA6A"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="104" y1="76" x2="398" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".92"/>
+      <stop offset=".34" stop-color="#6CEEFF" stop-opacity=".62"/>
+      <stop offset=".68" stop-color="#39FFBB" stop-opacity=".44"/>
+      <stop offset="1" stop-color="#06111F" stop-opacity=".12"/>
+    </linearGradient>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.12 0 0 0 0 0.85 0 0 0 0 1 0 0 0 .75 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#06111F"/>
+  <path d="M256 34 456 132v248L256 478 56 380V132L256 34Z" fill="#071B30"/>
+  <path d="M256 34 456 132 256 206 56 132 256 34Z" fill="#0C314D"/>
+  <path d="M456 132v248L256 478V206l200-74Z" fill="#082037"/>
+  <path d="M56 132v248l200 98V206L56 132Z" fill="#0A2841"/>
+  <g filter="url(#glow)">
+    <path d="M153 118h122c60 0 101 31 101 80 0 32-17 57-47 70 39 12 63 43 63 84 0 55-45 91-113 91H153V118Zm116 132c32 0 51-16 51-43 0-25-19-40-51-40h-55v83h55Zm10 144c35 0 56-18 56-48 0-29-21-46-58-46h-63v94h65Z" fill="url(#cyan)"/>
+    <path d="M214 167 153 118h122l-6 49h-55Z" fill="#E7FEFF" opacity=".64"/>
+    <path d="M320 207 269 167l6-49c60 0 101 31 101 80l-56 9Z" fill="#40E8FF" opacity=".8"/>
+    <path d="M214 250h55l60 18-52 32h-63v-50Z" fill="#47FFC3" opacity=".56"/>
+    <path d="M277 300 329 268c39 12 63 43 63 84l-57-6c0-29-21-46-58-46Z" fill="#FFD96C" opacity=".62"/>
+    <path d="M214 300v94l-61 49V118l61 49v83l-33 25 33 25Z" fill="url(#glass)" opacity=".34"/>
+  </g>
+  <path d="M78 256c0-98 80-178 178-178s178 80 178 178" fill="none" stroke="url(#cyan)" stroke-width="8" stroke-linecap="round" opacity=".62"/>
+  <path d="M434 256c0 98-80 178-178 178S78 354 78 256" fill="none" stroke="#42FFBC" stroke-width="4" stroke-linecap="round" stroke-dasharray="26 20" opacity=".44"/>
+  <circle cx="98" cy="256" r="10" fill="#42E8FF"/>
+  <circle cx="414" cy="256" r="7" fill="#FFDA6A"/>
+  <path d="M90 398 421 104" stroke="#D9FCFF" stroke-width="2" opacity=".18"/>
+</svg>

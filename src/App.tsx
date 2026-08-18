@@ -14,6 +14,7 @@ import {
   VolumeX,
   Wand2
 } from 'lucide-react';
+import balkizLogoUrl from './assets/balkiz-logo.svg';
 
 type Status = 'idle' | 'listening' | 'processing' | 'speaking';
 
@@ -615,11 +616,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <div className="logo-mark">
-            {import.meta.env.VITE_BALKIZ_LOGO_URL ? (
-              <img src={import.meta.env.VITE_BALKIZ_LOGO_URL} alt="BALKIZ logo" />
-            ) : (
-              'B'
-            )}
+            <img src={import.meta.env.VITE_BALKIZ_LOGO_URL || balkizLogoUrl} alt="BALKIZ logo" />
           </div>
           <div>
             <span>B.A.L.K.I.Z</span>
@@ -668,6 +665,11 @@ export default function App() {
             <div className="orbit orbit-a" />
             <div className="orbit orbit-b" />
             <div className="orbit orbit-c" />
+            <div className="hologram-projector" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
             <button
               className="orb-button"
               onClick={status === 'listening' ? stopListening : startListening}
@@ -676,6 +678,7 @@ export default function App() {
               style={{ transform: `scale(${1 + audioLevel * 0.13})` }}
             >
               <span className="orb-shine" />
+              <img className="orb-logo" src={balkizLogoUrl} alt="" aria-hidden="true" />
               <strong>{meta.icon}</strong>
               {status === 'listening' ? <Square size={34} /> : status === 'processing' ? <Loader2 size={34} /> : <Mic size={34} />}
             </button>
