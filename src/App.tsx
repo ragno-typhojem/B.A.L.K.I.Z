@@ -145,7 +145,8 @@ function playChime(kind: 'start' | 'stop' | 'ready' | 'error') {
 
 function selectRecorderMimeType() {
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-  return candidates.find((mime) => window.MediaRecorder?.isTypeSupported?.(mime)) || '';
+  if (typeof MediaRecorder === 'undefined') return '';
+  return candidates.find((mime) => MediaRecorder.isTypeSupported(mime)) || '';
 }
 
 function blobToDataUrl(blob: Blob) {
@@ -590,6 +591,11 @@ export default function App() {
     <main className="app-shell" style={{ '--status': meta.color, '--accent': meta.accent } as CSSProperties}>
       <div className="space-bg" />
       <div className="grid-glow" />
+      <div className="comets" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
       <div className="stars" aria-hidden="true">
         {stars.map((star) => (
           <span
@@ -678,6 +684,21 @@ export default function App() {
           <div className="status-card">
             <span>{meta.label}</span>
             <p>{status === 'processing' ? THINKING_LINES[thinkingIndex] : meta.helper}</p>
+          </div>
+
+          <div className="holo-readouts" aria-label="Canlı sistem göstergeleri">
+            <div>
+              <small>Merak Motoru</small>
+              <strong>{status === 'idle' ? 'Beklemede' : 'Aktif'}</strong>
+            </div>
+            <div>
+              <small>Ses Işığı</small>
+              <strong>{Math.round(audioLevel * 100)}%</strong>
+            </div>
+            <div>
+              <small>Görev Modu</small>
+              <strong>Çocuk Dostu</strong>
+            </div>
           </div>
 
           <div className="wave" aria-hidden="true">

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 function extensionFromMime(mimeType: string): string {
