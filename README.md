@@ -46,12 +46,14 @@ VITE_PARTNER_LOGO_URL=
 npm run dev
 npm run dev:vercel
 npm run build
+npm run typecheck
 npm run preview
 ```
 
 ## Deploy
 
 Vercel için ek ayar gerekmiyor. Bu repo Vite frontend ve `api/*.ts` serverless fonksiyonlarıyla hazırdır.
+Vercel Build Command `npm run build` olmalı; bu komut production bundle üretir. Tip kontrolü ayrı olarak `npm run typecheck` ile yapılır.
 
 ## Not
 
