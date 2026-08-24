@@ -32,13 +32,14 @@ Vercel Project Settings > Environment Variables bölümüne ekle:
 
 ```bash
 GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=openai/gpt-oss-120b
 ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 ELEVENLABS_VOICE_ID=XB0fDUnXU5powFXDhCwa
 VITE_BALKIZ_LOGO_URL=
 VITE_PARTNER_LOGO_URL=
 ```
 
-`ELEVENLABS_API_KEY` boş bırakılırsa uygulama yine çalışır; seslendirme tarayıcı üzerinden yapılır.
+`GROQ_MODEL` boş bırakılırsa `openai/gpt-oss-120b` kullanılır. `ELEVENLABS_API_KEY` boş bırakılırsa uygulama yine çalışır; seslendirme tarayıcı üzerinden yapılır.
 
 ## Komutlar
 
