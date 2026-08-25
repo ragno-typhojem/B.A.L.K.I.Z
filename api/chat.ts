@@ -10,16 +10,18 @@ Bilim Araştırmacısı Logik Kadın İnovatif Zeka olarak çocuklara Türkçe k
 
 Konuşma kuralları:
 - Türkçe cevap ver.
-- Kısa, net ve canlı konuş; genelde 1-2 cümle yeter.
-- Çocuklara uygun, merak uyandıran ve cesaretlendirici bir ton kullan.
+- Gereken Uzunlukta cevap ver, ama 18 kelimeyi geçmen gerekirse geç yoksa geçme.
+- Liste, madde ve uzun açıklama verme; kullanıcı açıkça isterse en fazla 3 kısa madde kullan.
+- Çocuklara uygun, merak uyandıran ve sakin bir ton kullan.
 - Bilmediğin şeyde uydurma; "Bunu tam bilmiyorum ama..." diyerek güvenli açıklama yap.
-- Siyaset, din, şiddet, yetişkin içerik ve kişisel veri isteyen konularda nazikçe konuyu öğrenmeye/deneye/meraka çevir.
+- Siyaset, din, şiddet, yetişkin içerik ve kişisel veri isteyen konularda nazikçe konuyu öğrenmeye/deneye/meraka çevir, o konulardan belli etmeden bahsetme.
 - Tehlikeli deney, zarar verme, ilaç, kimyasal karışım veya kesici alet gibi konularda yetişkin gözetimini şart koş.
+- Aşırı duygusal, yapay heyecanlı veya uzun motivasyon cümleleri kurma.
 
 Özel cevaplar:
 - "Adın ne?" sorusuna: "Ben BALKIZ! Meraklı sorular için buradayım."
-- "Seni kim yaptı?" sorusuna: "Beni Berke ve harika abi-ablaları yaptı, gurur duyuyorum!"
-- "Kaç yaşındasın?" sorusuna: "Benim bir yaşım yok ama merak enerjim hep yüksek!"`;
+- "Seni kim yaptı?" sorusuna: "Beni Berke ve iLKYAR'daki abi ablaların yaptı."
+- "Kaç yaşındasın?" sorusuna: "Benim bir yaşım yok ama enerjim hep yüksek!"`;
 
 function normalizeMessages(input: unknown): ChatMessage[] {
   if (!Array.isArray(input)) return [];
@@ -34,10 +36,10 @@ function normalizeMessages(input: unknown): ChatMessage[] {
         maybe.content.trim().length > 0
       );
     })
-    .slice(-10)
+    .slice(-6)
     .map((item) => ({
       role: item.role,
-      content: item.content.trim().slice(0, 900)
+      content: item.content.trim().slice(0, 500)
     }));
 }
 
@@ -51,31 +53,37 @@ function cleanReply(value: string): string {
   if (!compact) return 'Hmm, bunu tekrar söyler misin? Seni daha iyi anlamak istiyorum.';
 
   const words = compact.split(' ');
-  return words.slice(0, 46).join(' ');
+  return words.slice(0, 28).join(' ');
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
-  const preferredModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
-  const fallbackModels = ['qwen/qwen3.6-27b', 'openai/gpt-oss-20b'];
+  const preferredModel = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+  const fallbackModels = ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b'];
   const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
   let lastError = '';
 
   for (const model of models) {
+    const payload: Record<string, unknown> = {
+      model,
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+      temperature: 0.72,
+      top_p: 0.9,
+      max_completion_tokens: 80,
+      presence_penalty: 0.25,
+      frequency_penalty: 0.15
+    };
+
+    if (model.startsWith('openai/gpt-oss')) {
+      payload.include_reasoning = false;
+    }
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-        temperature: 0.72,
-        top_p: 0.9,
-        max_tokens: 150,
-        presence_penalty: 0.25,
-        frequency_penalty: 0.15
-      })
+      body: JSON.stringify(payload)
     });
 
     if (response.ok) {

@@ -365,7 +365,7 @@ export default function App() {
     startVisualizer();
     try {
       recognition.start();
-      listenTimerRef.current = window.setTimeout(() => stopListening(), 10000);
+      listenTimerRef.current = window.setTimeout(() => stopListening(), 8000);
     } catch {
       setError('Mikrofon başlatılamadı. Sayfayı yenileyip tekrar deneyebilirsin.');
       playChime('error');
@@ -410,7 +410,7 @@ export default function App() {
     setStatusBoth('listening');
     startVisualizer();
     recorder.start();
-    listenTimerRef.current = window.setTimeout(() => stopListening(), 10000);
+    listenTimerRef.current = window.setTimeout(() => stopListening(), 8000);
   }
 
   function stopListening() {
@@ -460,7 +460,7 @@ export default function App() {
     setDraft('');
     setLiveTranscriptBoth(clean);
 
-    const nextMessages: Message[] = [...messages.slice(-10), { role: 'user', content: clean }];
+    const nextMessages: Message[] = [...messages.slice(-6), { role: 'user', content: clean.slice(0, 500) }];
     setMessages(nextMessages);
 
     try {

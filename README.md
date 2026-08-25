@@ -32,14 +32,16 @@ Vercel Project Settings > Environment Variables bölümüne ekle:
 
 ```bash
 GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=openai/gpt-oss-120b
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_TRANSCRIBE_MODEL=whisper-large-v3-turbo
 ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
-ELEVENLABS_VOICE_ID=XB0fDUnXU5powFXDhCwa
+ELEVENLABS_VOICE_ID=EXAVITQu4vr4xnSDxMaL
+ELEVENLABS_MODEL_ID=eleven_flash_v2_5
 VITE_BALKIZ_LOGO_URL=
 VITE_PARTNER_LOGO_URL=
 ```
 
-`GROQ_MODEL` boş bırakılırsa `openai/gpt-oss-120b` kullanılır. `ELEVENLABS_API_KEY` boş bırakılırsa uygulama yine çalışır; seslendirme tarayıcı üzerinden yapılır.
+`GROQ_MODEL` boş bırakılırsa ucuz ve hızlı `openai/gpt-oss-20b` kullanılır. `GROQ_TRANSCRIBE_MODEL` boş bırakılırsa `whisper-large-v3-turbo` kullanılır. `ELEVENLABS_API_KEY` boş bırakılırsa uygulama yine çalışır; seslendirme tarayıcı üzerinden yapılır.
 
 ## Komutlar
 

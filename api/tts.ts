@@ -14,8 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const text = String(body?.text ?? '').trim().slice(0, 700);
-    const voiceId = String(process.env.ELEVENLABS_VOICE_ID || 'XB0fDUnXU5powFXDhCwa');
+    const text = String(body?.text ?? '').trim().slice(0, 320);
+    const voiceId = String(process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL');
+    const modelId = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_flash_v2_5');
 
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
@@ -29,12 +30,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_multilingual_v2',
+        model_id: modelId,
         voice_settings: {
-          stability: 0.72,
-          similarity_boost: 0.9,
-          style: 0.18,
-          use_speaker_boost: true
+          stability: 0.86,
+          similarity_boost: 0.78,
+          style: 0,
+          speed: 1.03,
+          use_speaker_boost: false
         }
       })
     });

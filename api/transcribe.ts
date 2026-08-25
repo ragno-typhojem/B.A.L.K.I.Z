@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const form = new FormData();
     form.append('file', new Blob([arrayBuffer], { type: mimeType }), `speech.${extensionFromMime(mimeType)}`);
-    form.append('model', 'whisper-large-v3');
+    form.append('model', process.env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3-turbo');
     form.append('language', 'tr');
     form.append('response_format', 'json');
     form.append('temperature', '0');
