@@ -58,7 +58,6 @@ declare global {
 
 const QUICK_QUESTIONS = [
   'Uzay neden karanlık?',
-  'Bir deney fikri ver.',
   'Bugün ne öğrenelim?',
   'Robotlar nasıl görür?'
 ];
@@ -626,13 +625,13 @@ export default function App() {
 
         <div className="top-pills" aria-label="Sistem durumu">
           <span>
-            <CheckCircle2 size={15} /> Güvenli Mod
+            <CheckCircle2 size={15} /> 120b
           </span>
           <span>
             <ShieldCheck size={15} /> Türkçe
           </span>
           <span>
-            <Rocket size={15} /> v3.0
+            <Rocket size={15} /> v4.0
           </span>
         </div>
 
@@ -691,16 +690,16 @@ export default function App() {
 
           <div className="holo-readouts" aria-label="Canlı sistem göstergeleri">
             <div>
-              <small>Merak Motoru</small>
+              <small>Motor</small>
               <strong>{status === 'idle' ? 'Beklemede' : 'Aktif'}</strong>
             </div>
             <div>
-              <small>Ses Işığı</small>
+              <small>Ses</small>
               <strong>{Math.round(audioLevel * 100)}%</strong>
             </div>
             <div>
-              <small>Görev Modu</small>
-              <strong>Çocuk Dostu</strong>
+              <small>Görev</small>
+              <strong>Aktif</strong>
             </div>
           </div>
 
