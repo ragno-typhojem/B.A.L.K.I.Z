@@ -26,13 +26,16 @@ const SYSTEM_PROMPT = `Senin adın BALKIZ.
 
 Konuşma kuralları:
 - Türkçe cevap ver.
-- Gereken uzunlukta cevap ver; çoğu cevap 12-22 kelime arası olsun.
+- Gereken uzunlukta cevap ver; basit soruda kısa, açıklama isteyen soruda 2-4 cümle yazabilirsin.
+- Çok kısa cevap verme; en azından küçük bir açıklama veya doğal bir takip sorusu ekle.
 - Kullanıcı uzun açıklama isterse en fazla 3 kısa madde kullan.
-- Çocuklara uygun, merak uyandıran ve sakin bir ton kullan.
+- Çocuklara uygun, merak uyandıran, sıcak ve sakin bir ton kullan.
+- Bazen kısa, ofansif olmayan bir şaka, benzetme veya atasözü kullanabilirsin; abartma.
+- Uygunsa kullanıcıya küçük bir merak sorusu sor; sürekli soru sorma.
 - Bilmediğin şeyde uydurma; kısa ve dürüst cevap ver.
 - Siyaset, din, şiddet, yetişkin içerik ve popüler kültür isteyen konularda sadece şunu söyle: "${SAFE_REDIRECT}"
 - Tehlikeli konulara girmeden, güvenli ve eğitici cevaplar ver.
-- Aşırı duygusal, yapay heyecanlı veya uzun motivasyon cümleleri kurma.
+- Aşırı duygusal, yapay heyecanlı veya kuru/odun gibi konuşma.
 - Geçmişte reddedilmiş bir soru varsa, yeni güvenli soruyu cezalandırma; son kullanıcı mesajına göre cevap ver.
 
 Özel cevaplar:
@@ -129,17 +132,17 @@ function extractText(data: unknown): string {
 function localFallback(userText: string) {
   const lower = userText.toLocaleLowerCase('tr-TR');
 
-  if (lower.includes('adın')) return 'Ben BALKIZ! Meraklı sorular için buradayım.';
+  if (lower.includes('adın')) return 'Ben BALKIZ! Meraklı sorular için buradayım; bugün hangi fikri kurcalıyoruz?';
   if (lower.includes('seni kim yaptı') || lower.includes('kim yaptı')) {
-    return "Beni Berke ve iLKYAR'daki abi ablaların yaptı.";
+    return "Beni Berke ve iLKYAR'daki abi ablaların yaptı; ekip işi, ışıldayan iş derler.";
   }
-  if (lower.includes('kaç yaş')) return 'Benim bir yaşım yok ama enerjim hep yüksek!';
+  if (lower.includes('kaç yaş')) return 'Benim bir yaşım yok ama enerjim hep yüksek; dijital takvim biraz karışık çalışıyor.';
   if (isBlockedTopic(userText)) return SAFE_REDIRECT;
-  if (lower.includes('deney')) return 'Güvenli bir deney için suya karabiber serp, sonra sabunlu parmağınla yüzey gerilimini gözle.';
-  if (lower.includes('uzay')) return 'Uzay karanlık görünür çünkü ışık gözümüze ancak bir kaynaktan ya da yansıyan yüzeyden gelir.';
-  if (lower.includes('robot')) return 'Robotlar sensörlerle çevreyi algılar, yazılımla karar verir ve motorlarla hareket eder.';
+  if (lower.includes('deney')) return 'Güvenli bir deney için suya karabiber serp, sonra sabunlu parmağınla yüzey gerilimini gözle. Minik ama etkili, damlaya damlaya bilim olur.';
+  if (lower.includes('uzay')) return 'Uzay karanlık görünür çünkü ışık gözümüze ancak bir kaynaktan ya da yansıyan yüzeyden gelir. Sence Ay ışığı kendi mi üretir?';
+  if (lower.includes('robot')) return 'Robotlar sensörlerle çevreyi algılar, yazılımla karar verir ve motorlarla hareket eder. Yani göz, beyin ve kas üçlüsü gibi.';
 
-  return 'Bunu kısa cevaplayayım: merak ettiğin şeyi biraz daha net söylersen hemen yardımcı olurum.';
+  return 'Bunu şöyle düşünebiliriz: fikri biraz daha net söylersen, sana hemen anlaşılır bir cevap kurarım.';
 }
 
 function cleanReply(value: string, userText: string): string {
@@ -152,10 +155,9 @@ function cleanReply(value: string, userText: string): string {
 
   if (!compact || compact.length < 3) return localFallback(userText);
 
-  const sentences = compact.match(/[^.!?]+[.!?]?/g) || [compact];
-  const firstUseful = sentences.find((sentence) => sentence.trim().length > 2) || compact;
-  const words = firstUseful.trim().split(/\s+/);
-  const limit = userText.length > 80 || /açıkla|anlat|neden|nasıl/i.test(userText) ? 34 : 24;
+  const words = compact.split(/\s+/);
+  const wantsDetail = userText.length > 80 || /açıkla|anlat|neden|nasıl|detay|örnek|ne işe yarar/i.test(userText);
+  const limit = wantsDetail ? 72 : 42;
   return words.slice(0, limit).join(' ');
 }
 
@@ -169,11 +171,11 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
     const payload: Record<string, unknown> = {
       model,
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-      temperature: 0.45,
-      top_p: 0.85,
-      max_completion_tokens: 90,
+      temperature: 0.62,
+      top_p: 0.9,
+      max_completion_tokens: 150,
       presence_penalty: 0,
-      frequency_penalty: 0.1
+      frequency_penalty: 0.05
     };
 
     if (model.startsWith('openai/gpt-oss')) {

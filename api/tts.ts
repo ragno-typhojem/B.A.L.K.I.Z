@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const text = String(body?.text ?? '').trim().slice(0, 320);
+    const text = String(body?.text ?? '').trim().slice(0, 520);
     const voiceId = String(process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL');
     const modelId = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_flash_v2_5');
 
