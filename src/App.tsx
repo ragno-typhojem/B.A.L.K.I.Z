@@ -639,7 +639,14 @@ export default function App() {
           <img
             src="https://blog.metu.edu.tr/wwwilk/files/2025/10/cropped-cropped-cropped-tisort_logo.png"
             alt="Partner logo"
-            style={{ maxWidth: '120px', maxHeight: '48px', width: 'auto', height: 'auto', objectFit: 'contain' }}
+            style={{
+              display: 'block',
+              width: '120px',
+              height: '48px',
+              maxWidth: '100%',
+              objectFit: 'contain',
+              objectPosition: 'center'
+            }}
           />
         </div>
       </header>
