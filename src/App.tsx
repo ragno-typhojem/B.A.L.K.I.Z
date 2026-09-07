@@ -636,11 +636,11 @@ export default function App() {
         </div>
 
         <div className="partner-logo">
-          {import.meta.env.VITE_PARTNER_LOGO_URL ? (
-            <img src={import.meta.env.VITE_PARTNER_LOGO_URL} alt="Partner logo" />
-          ) : (
-            <span>Logo</span>
-          )}
+          <img
+            src="https://blog.metu.edu.tr/wwwilk/files/2025/10/cropped-cropped-cropped-tisort_logo.png"
+            alt="Partner logo"
+            style={{ maxWidth: '120px', maxHeight: '48px', width: 'auto', height: 'auto', objectFit: 'contain' }}
+          />
         </div>
       </header>
 
