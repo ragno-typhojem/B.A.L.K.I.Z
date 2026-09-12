@@ -173,7 +173,7 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       temperature: 0.62,
       top_p: 0.9,
-      max_completion_tokens: 150,
+      max_completion_tokens: 300,
       presence_penalty: 0,
       frequency_penalty: 0.05
     };
