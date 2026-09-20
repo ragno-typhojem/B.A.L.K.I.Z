@@ -171,11 +171,11 @@ function cleanReply(value: string, userText: string): string {
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
-  // ANA MODEL: Token dostu, ultra hızlı ve kotayı bitirmeyen model (Çocuklarla sohbet için en iyisi)
+  // ANA MODEL: Hızlı ve token dostu güncel model
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   
-  // YEDEK MODELLER: Ana model çökerse devreye girecek modeller
-  const fallbackModels = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+  // YEDEK MODEL: Sadece ana model çökerse kullanılacak güçlü model
+  const fallbackModels = ['llama-3.3-70b-versatile'];
   
   const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
   let lastError = '';
@@ -184,7 +184,7 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
     const payload: Record<string, unknown> = {
       model,
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-      temperature: 0.65, // Doğal ve rahat konuşması için ideal sıcaklık
+      temperature: 0.65,
       top_p: 0.9,
       max_tokens: 350,
       presence_penalty: 0,
@@ -204,7 +204,7 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
 
     lastError = await response.text();
     
-    // Model kapalıysa (decommissioned) veya erişim yoksa diğerine geç
+    // Hata durumunda (model kapalıysa veya yoksa) döngüye devam et
     const canTryNext =
       response.status === 404 ||
       response.status === 403 ||
