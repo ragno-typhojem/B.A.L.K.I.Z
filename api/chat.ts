@@ -171,52 +171,32 @@ function cleanReply(value: string, userText: string): string {
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
-  // ANA MODEL: Hızlı ve token dostu güncel model
-  const preferredModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  // Herkese açık, ücretsiz ve stabil olan tek model.
+  const model = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   
-  // YEDEK MODEL: Sadece ana model çökerse kullanılacak güçlü model
-  const fallbackModels = ['llama-3.3-70b-versatile'];
-  
-  const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
-  let lastError = '';
+  const payload: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+    temperature: 0.65,
+    top_p: 0.9,
+    max_tokens: 350,
+    presence_penalty: 0,
+    frequency_penalty: 0.05
+  };
 
-  for (const model of models) {
-    const payload: Record<string, unknown> = {
-      model,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-      temperature: 0.65,
-      top_p: 0.9,
-      max_tokens: 350,
-      presence_penalty: 0,
-      frequency_penalty: 0.05
-    };
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+  if (response.ok) return response;
 
-    if (response.ok) return response;
-
-    lastError = await response.text();
-    
-    // Hata durumunda (model kapalıysa veya yoksa) döngüye devam et
-    const canTryNext =
-      response.status === 404 ||
-      response.status === 403 ||
-      lastError.includes('model_not_found') ||
-      lastError.includes('does not exist') ||
-      lastError.includes('do not have access') ||
-      lastError.includes('model_decommissioned'); 
-
-    if (!canTryNext) return new Response(lastError, { status: response.status });
-  }
-
-  return new Response(lastError || 'No available Groq model', { status: 502 });
+  const lastError = await response.text();
+  return new Response(lastError, { status: response.status });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
