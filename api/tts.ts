@@ -1,12 +1,23 @@
 import { Buffer } from 'node:buffer';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// ElevenLabs'in markdown sembollerini (*, #) "yıldız" diye okumasını veya takılmasını önler
+// Matematik sembollerini Türkçe kelimelere çeviren ve markdown kalıntılarını silen filtre
 function sanitizeForTTS(text: string): string {
-  return text
-    .replace(/[*_~`#]/g, '')
-    .trim()
-    .slice(0, 520);
+  let cleanText = text.replace(/[*_~`#]/g, '');
+  
+  // ElevenLabs yutmasın diye Matematiksel Operatörleri Türkçeleştirme
+  cleanText = cleanText.replace(/\+/g, ' artı ');
+  cleanText = cleanText.replace(/=/g, ' eşittir ');
+  cleanText = cleanText.replace(/%/g, ' yüzde ');
+  
+  // Eksi ve Bölü işaretini sadece sayılar arasında ise çevir (tirelerle karışmasını engeller)
+  cleanText = cleanText.replace(/(\d+)\s*-\s*(\d+)/g, '$1 eksi $2');
+  cleanText = cleanText.replace(/(\d+)\s*\/\s*(\d+)/g, '$1 bölü $2');
+  
+  // 2x2 veya 2 X 2 şeklindeki çarpım işlemlerini "çarpı" kelimesine dönüştür
+  cleanText = cleanText.replace(/(\d+)\s*[xX]\s*(\d+)/g, '$1 çarpı $2');
+
+  return cleanText.replace(/\s+/g, ' ').trim().slice(0, 520);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -26,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const text = sanitizeForTTS(rawText);
 
     const voiceId = String(process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL');
-    // eleven_flash_v2_5, ElevenLabs'in en ucuz ve en hızlı modelidir, ekonomik kalması için dokunmuyoruz.
+    // eleven_flash_v2_5 en ucuz ve çocuk sesleri için en hızlı modeldir.
     const modelId = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_flash_v2_5');
 
     if (!text) {
@@ -43,11 +54,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         text,
         model_id: modelId,
         voice_settings: {
-          // Stabiliteyi düşürmek robotikliği alır, sese duygu ve doğallık katar
+          // Çocuklara daha uygun, enerjik ve berrak bir okuma stili ayarları
           stability: 0.45, 
           similarity_boost: 0.75,
-          style: 0.1, // Hafif abartı/duygu katar, çocuk projeleri için harikadır
-          use_speaker_boost: true // Sesi çok daha berrak yapar (ekstra ücret almaz)
+          style: 0.1, 
+          use_speaker_boost: true
         }
       })
     });
@@ -61,8 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     res.setHeader('Content-Type', response.headers.get('content-type') || 'audio/mpeg');
     
-    // EKONOMİ KİLİDİ: Vercel'in aynı metinler için üretilmiş sesleri 1 ay boyunca önbellekte tutmasını sağlar.
-    // Aynı soru sorulduğunda ElevenLabs API'si yerine Vercel CDN bedavaya yanıt verir.
+    // EKONOMİ KİLİDİ: Vercel önbelleklemesi ile aynı soruda API ücretini sıfırlar.
     res.setHeader('Cache-Control', 'public, s-maxage=2592000, stale-while-revalidate=86400');
     
     return res.status(200).send(audio);

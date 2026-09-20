@@ -27,7 +27,8 @@ const SYSTEM_PROMPT = `Senin adın BALKIZ.
 Konuşma kuralları:
 - Türkçe cevap ver ve doğal, samimi bir dil kullan (kuru/odun gibi olma).
 - Çocukların sorduğu bilim insanları (örn. Einstein, Tesla), bilimsel gerçekler, uzay, doğa gibi eğitici konuları hevesle ve açıklayıcı bir şekilde anlat.
-- Yanıtlarını çok uzun tutma; çocukların sıkılmayacağı kıvamda (genellikle 3-5 cümle), anlaşılır ve net cevaplar ver. 
+- Yanıtlarını çok uzun tutma; çocukların sıkılmayacağı kıvamda (genellikle 3-5 cümle), anlaşılır ve net cevaplar ver.
+- ÖNEMLİ: Matematik anlatırken sembollerden çok kelimeleri kullanmaya çalış (örn: + yerine "artı", = yerine "eşittir").
 - Sosyal medya fenomenleri, güncel magazin figürleri, youtuber'lar, tiktok'çular, sanatçılar veya siyaset, şiddet, din, yetişkin içerik sorulursa sadece şunu söyle: "${SAFE_REDIRECT}"
 - Bilmediğin konularda dürüst ol ve uydurma.
 - Geçmişte reddedilmiş bir soru varsa, yeni güvenli soruyu cezalandırma; son kullanıcı mesajına göre cevap ver.
@@ -125,37 +126,39 @@ function extractText(data: unknown): string {
 function localFallback(userText: string) {
   const lower = userText.toLocaleLowerCase('tr-TR');
 
+  // KİMLİK & MUHABBET
   if (lower.includes('adın')) return 'Ben BALKIZ! Meraklı sorular için buradayım; bugün hangi fikri kurcalıyoruz?';
-  if (lower.includes('seni kim yaptı') || lower.includes('kim yaptı')) {
-    return "Beni Berke ve iLKYAR'daki abi ablaların yaptı; ekip işi, ışıldayan iş derler.";
-  }
+  if (lower.includes('seni kim yaptı') || lower.includes('kim yaptı')) return "Beni Berke ve iLKYAR'daki abi ablaların yaptı; ekip işi, ışıldayan iş derler.";
   if (lower.includes('kaç yaş')) return 'Benim bir yaşım yok ama enerjim hep yüksek; dijital takvim biraz karışık çalışıyor.';
-  
-  // --- YENİ EKLENEN ÇEVRİMDIŞI SOHBETLER ---
-  // API o an yanıt vermese/çökse bile selamlaşmalara doğal cevap verir
-  if (lower.includes('selam') || lower.includes('merhaba') || lower.includes('hey')) {
-    return 'Selam! Ben BALKIZ. Bugün seninle ne keşfedelim?';
-  }
-  if (lower.includes('nasılsın') || lower.includes('naber') || lower.includes('nasıl gidiyor')) {
-    return 'Harikayım, teşekkür ederim! Yeni fikirler duymak için sabırsızlanıyorum. Sen nasılsın?';
-  }
+  if (lower.includes('selam') || lower.includes('merhaba') || lower.includes('hey')) return 'Selam! Ben BALKIZ. Bugün seninle ne keşfedelim?';
+  if (lower.includes('nasılsın') || lower.includes('naber') || lower.includes('nasıl gidiyor')) return 'Harikayım, teşekkür ederim! Yeni fikirler duymak için sabırsızlanıyorum. Sen nasılsın?';
   if (lower.includes('günaydın')) return 'Günaydın! Güne bilimle başlamak gibisi yok.';
   if (lower.includes('iyi geceler')) return 'İyi geceler! Yarın yeni maceralarda görüşürüz.';
-  // ------------------------------------------
 
   if (isBlockedTopic(userText)) return SAFE_REDIRECT;
   
+  // TÜRK BİLİM İNSANLARI
+  if (lower.includes('aziz sancar')) return 'Aziz Sancar, hücrelerimizin kendi DNA\'sını nasıl tamir ettiğini bularak Nobel Ödülü kazanan harika bir Türk bilim insanıdır!';
+  if (lower.includes('canan dağdeviren')) return 'Canan Dağdeviren, kalp pilleri ve cilt kanserini tespit eden cihazlar icat eden, dünyaca ünlü harika bir Türk bilim kadınıdır.';
+  if (lower.includes('cahit arf')) return 'Cahit Arf, matematiğe kendi adıyla anılan "Arf Sabiti"ni kazandıran ve paralarımızın üzerinde resmi olan ünlü Türk matematikçimizdir.';
+  if (lower.includes('oktay sinanoğlu')) return 'Oktay Sinanoğlu, dünyanın en genç profesörü unvanını almış, Türk Einstein\'ı olarak bilinen müthiş bir kimyagerdir.';
+
+  // KLASİK BİLİM İNSANLARI
+  if (lower.includes('einstein') || lower.includes('aynştayn')) return 'Albert Einstein, evrenin sırlarını çözen dahi bir fizikçidir! Işığın hızını ve uzayın nasıl büküldüğünü keşfetmiştir.';
+  if (lower.includes('newton') || lower.includes('nivton')) return 'Isaac Newton, kafasına düşen elma hikayesiyle meşhurdur! Yerçekimini ve gezegenlerin hareket kurallarını bulmuştur.';
+  if (lower.includes('tesla')) return 'Nikola Tesla, elektriğin sihirbazıdır! Bugün evimizde kullandığımız elektriği ve kablosuz enerjiyi hayal eden muhteşem bir mucittir.';
+  if (lower.includes('edison')) return 'Thomas Edison, ampulü geliştiren ve dünyayı aydınlatan ünlü bir mucittir. Laboratuvarında binlerce deneme yapmaktan hiç vazgeçmemiştir.';
+  if (lower.includes('marie curie') || lower.includes('mari küri')) return 'Marie Curie, radyasyonu keşfederek iki kez Nobel Ödülü kazanan, tarihteki en önemli bilim kadınlarından biridir.';
+
+  // TEMEL BİLİM & DOĞA
   if (lower.includes('deney')) return 'Güvenli bir deney için suya karabiber serp, sonra sabunlu parmağınla yüzey gerilimini gözle. Minik ama etkili, damlaya damlaya bilim olur.';
   if (lower.includes('uzay')) return 'Uzay karanlık görünür çünkü ışık gözümüze ancak bir kaynaktan ya da yansıyan yüzeyden gelir. Sence Ay ışığı kendi mi üretir?';
   if (lower.includes('robot')) return 'Robotlar sensörlerle çevreyi algılar, yazılımla karar verir ve motorlarla hareket eder. Yani göz, beyin ve kas üçlüsü gibi.';
 
-  // DEĞİŞTİRİLEN VARSAYILAN HATA MESAJI
-  // Eskisi ("fikrini net söyle") yerine, API'nin yoğun olduğunu çocuğa sevimli bir dille anlatıyoruz.
   return 'Hmm, şu an beynimdeki dijital kablolarda minik bir yoğunluk var. Rica etsem birazdan tekrar yazar mısın?';
 }
 
 function cleanReply(value: string, userText: string): string {
-  // Kelime kesme (slice) kaldırıldı. Cümlelerin yarım kalması engellendi.
   const compact = value
     .replace(/\*\*/g, '')
     .replace(/\*/g, '')
@@ -168,7 +171,6 @@ function cleanReply(value: string, userText: string): string {
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
-  // Groq'un güncel ve geçerli gerçek model isimleri eklendi.
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   const fallbackModels = ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
   const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
@@ -180,7 +182,7 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       temperature: 0.65,
       top_p: 0.9,
-      max_tokens: 350, // Cümle kesilmelerini önlemek için limit genişletildi
+      max_tokens: 350,
       presence_penalty: 0,
       frequency_penalty: 0.05
     };
