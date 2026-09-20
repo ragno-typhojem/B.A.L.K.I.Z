@@ -171,9 +171,12 @@ function cleanReply(value: string, userText: string): string {
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
-  // Kapatılan mixtral modeli yerine güncel ve çalışan gemma2 eklendi.
+  // ANA MODEL: Token dostu, ultra hızlı ve kotayı bitirmeyen model (Çocuklarla sohbet için en iyisi)
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const fallbackModels = ['llama-3.3-70b-versatile', 'gemma2-9b-it'];
+  
+  // YEDEK MODELLER: Ana model çökerse devreye girecek modeller
+  const fallbackModels = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+  
   const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
   let lastError = '';
 
@@ -181,7 +184,7 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
     const payload: Record<string, unknown> = {
       model,
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-      temperature: 0.65,
+      temperature: 0.65, // Doğal ve rahat konuşması için ideal sıcaklık
       top_p: 0.9,
       max_tokens: 350,
       presence_penalty: 0,
@@ -200,13 +203,15 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
     if (response.ok) return response;
 
     lastError = await response.text();
+    
+    // Model kapalıysa (decommissioned) veya erişim yoksa diğerine geç
     const canTryNext =
       response.status === 404 ||
       response.status === 403 ||
       lastError.includes('model_not_found') ||
       lastError.includes('does not exist') ||
       lastError.includes('do not have access') ||
-      lastError.includes('model_decommissioned'); // Kapatılan modelleri es geçme eklendi
+      lastError.includes('model_decommissioned'); 
 
     if (!canTryNext) return new Response(lastError, { status: response.status });
   }
