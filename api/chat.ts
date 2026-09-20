@@ -171,8 +171,9 @@ function cleanReply(value: string, userText: string): string {
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
+  // Kapatılan mixtral modeli yerine güncel ve çalışan gemma2 eklendi.
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const fallbackModels = ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
+  const fallbackModels = ['llama-3.3-70b-versatile', 'gemma2-9b-it'];
   const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
   let lastError = '';
 
@@ -204,7 +205,8 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
       response.status === 403 ||
       lastError.includes('model_not_found') ||
       lastError.includes('does not exist') ||
-      lastError.includes('do not have access');
+      lastError.includes('do not have access') ||
+      lastError.includes('model_decommissioned'); // Kapatılan modelleri es geçme eklendi
 
     if (!canTryNext) return new Response(lastError, { status: response.status });
   }
