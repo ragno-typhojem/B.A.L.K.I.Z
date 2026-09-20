@@ -130,12 +130,28 @@ function localFallback(userText: string) {
     return "Beni Berke ve iLKYAR'daki abi ablaların yaptı; ekip işi, ışıldayan iş derler.";
   }
   if (lower.includes('kaç yaş')) return 'Benim bir yaşım yok ama enerjim hep yüksek; dijital takvim biraz karışık çalışıyor.';
+  
+  // --- YENİ EKLENEN ÇEVRİMDIŞI SOHBETLER ---
+  // API o an yanıt vermese/çökse bile selamlaşmalara doğal cevap verir
+  if (lower.includes('selam') || lower.includes('merhaba') || lower.includes('hey')) {
+    return 'Selam! Ben BALKIZ. Bugün seninle ne keşfedelim?';
+  }
+  if (lower.includes('nasılsın') || lower.includes('naber') || lower.includes('nasıl gidiyor')) {
+    return 'Harikayım, teşekkür ederim! Yeni fikirler duymak için sabırsızlanıyorum. Sen nasılsın?';
+  }
+  if (lower.includes('günaydın')) return 'Günaydın! Güne bilimle başlamak gibisi yok.';
+  if (lower.includes('iyi geceler')) return 'İyi geceler! Yarın yeni maceralarda görüşürüz.';
+  // ------------------------------------------
+
   if (isBlockedTopic(userText)) return SAFE_REDIRECT;
+  
   if (lower.includes('deney')) return 'Güvenli bir deney için suya karabiber serp, sonra sabunlu parmağınla yüzey gerilimini gözle. Minik ama etkili, damlaya damlaya bilim olur.';
   if (lower.includes('uzay')) return 'Uzay karanlık görünür çünkü ışık gözümüze ancak bir kaynaktan ya da yansıyan yüzeyden gelir. Sence Ay ışığı kendi mi üretir?';
   if (lower.includes('robot')) return 'Robotlar sensörlerle çevreyi algılar, yazılımla karar verir ve motorlarla hareket eder. Yani göz, beyin ve kas üçlüsü gibi.';
 
-  return 'Bunu şöyle düşünebiliriz: fikri biraz daha net söylersen, sana hemen anlaşılır bir cevap kurarım.';
+  // DEĞİŞTİRİLEN VARSAYILAN HATA MESAJI
+  // Eskisi ("fikrini net söyle") yerine, API'nin yoğun olduğunu çocuğa sevimli bir dille anlatıyoruz.
+  return 'Hmm, şu an beynimdeki dijital kablolarda minik bir yoğunluk var. Rica etsem birazdan tekrar yazar mısın?';
 }
 
 function cleanReply(value: string, userText: string): string {
