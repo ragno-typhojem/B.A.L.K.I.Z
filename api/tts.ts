@@ -1,6 +1,14 @@
 import { Buffer } from 'node:buffer';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// ElevenLabs'in markdown sembollerini (*, #) "yıldız" diye okumasını veya takılmasını önler
+function sanitizeForTTS(text: string): string {
+  return text
+    .replace(/[*_~`#]/g, '')
+    .trim()
+    .slice(0, 520);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -14,8 +22,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const text = String(body?.text ?? '').trim().slice(0, 520);
+    const rawText = String(body?.text ?? '');
+    const text = sanitizeForTTS(rawText);
+
     const voiceId = String(process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL');
+    // eleven_flash_v2_5, ElevenLabs'in en ucuz ve en hızlı modelidir, ekonomik kalması için dokunmuyoruz.
     const modelId = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_flash_v2_5');
 
     if (!text) {
@@ -32,11 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         text,
         model_id: modelId,
         voice_settings: {
-          stability: 0.86,
-          similarity_boost: 0.78,
-          style: 0,
-          speed: 1.03,
-          use_speaker_boost: false
+          // Stabiliteyi düşürmek robotikliği alır, sese duygu ve doğallık katar
+          stability: 0.45, 
+          similarity_boost: 0.75,
+          style: 0.1, // Hafif abartı/duygu katar, çocuk projeleri için harikadır
+          use_speaker_boost: true // Sesi çok daha berrak yapar (ekstra ücret almaz)
         }
       })
     });
@@ -47,8 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const audio = Buffer.from(await response.arrayBuffer());
+    
     res.setHeader('Content-Type', response.headers.get('content-type') || 'audio/mpeg');
-    res.setHeader('Cache-Control', 'no-store');
+    
+    // EKONOMİ KİLİDİ: Vercel'in aynı metinler için üretilmiş sesleri 1 ay boyunca önbellekte tutmasını sağlar.
+    // Aynı soru sorulduğunda ElevenLabs API'si yerine Vercel CDN bedavaya yanıt verir.
+    res.setHeader('Cache-Control', 'public, s-maxage=2592000, stale-while-revalidate=86400');
+    
     return res.status(200).send(audio);
   } catch (error) {
     console.error(error);

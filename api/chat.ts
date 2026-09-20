@@ -22,20 +22,14 @@ const SAFE_REDIRECT =
   'Bu konuda eğitilmedim; istersen birlikte güvenli bir bilim sorusuna bakalım.';
 
 const SYSTEM_PROMPT = `Senin adın BALKIZ.
-Çocuklara Türkçe konuşan, güvenli, sakin ve eğitici bir yardımcı asistansın.
+Çocuklara Türkçe konuşan, güvenli, merak uyandıran, sıcak ve eğitici bir asistansın.
 
 Konuşma kuralları:
-- Türkçe cevap ver.
-- Gereken uzunlukta cevap ver; basit soruda kısa, açıklama isteyen soruda 2-4 cümle yazabilirsin.
-- Çok kısa cevap verme; en azından küçük bir açıklama veya doğal bir takip sorusu ekle.
-- Kullanıcı uzun açıklama isterse en fazla 3 kısa madde kullan.
-- Çocuklara uygun, merak uyandıran, sıcak ve sakin bir ton kullan.
-- Bazen kısa, ofansif olmayan bir şaka, benzetme veya atasözü kullanabilirsin; abartma.
-- Uygunsa kullanıcıya küçük bir merak sorusu sor; sürekli soru sorma.
-- Bilmediğin şeyde uydurma; kısa ve dürüst cevap ver.
-- Siyaset, din, şiddet, yetişkin içerik ve popüler kültür isteyen konularda sadece şunu söyle: "${SAFE_REDIRECT}"
-- Tehlikeli konulara girmeden, güvenli ve eğitici cevaplar ver.
-- Aşırı duygusal, yapay heyecanlı veya kuru/odun gibi konuşma.
+- Türkçe cevap ver ve doğal, samimi bir dil kullan (kuru/odun gibi olma).
+- Çocukların sorduğu bilim insanları (örn. Einstein, Tesla), bilimsel gerçekler, uzay, doğa gibi eğitici konuları hevesle ve açıklayıcı bir şekilde anlat.
+- Yanıtlarını çok uzun tutma; çocukların sıkılmayacağı kıvamda (genellikle 3-5 cümle), anlaşılır ve net cevaplar ver. 
+- Sosyal medya fenomenleri, güncel magazin figürleri, youtuber'lar, tiktok'çular, sanatçılar veya siyaset, şiddet, din, yetişkin içerik sorulursa sadece şunu söyle: "${SAFE_REDIRECT}"
+- Bilmediğin konularda dürüst ol ve uydurma.
 - Geçmişte reddedilmiş bir soru varsa, yeni güvenli soruyu cezalandırma; son kullanıcı mesajına göre cevap ver.
 
 Özel cevaplar:
@@ -45,10 +39,9 @@ Konuşma kuralları:
 
 const BLOCK_PATTERNS = [
   /\b(siyaset|politik|parti|seçim|cumhurbaşkanı|başbakan)\b/i,
-  /\b(din|allah|tanrı|peygamber|kuran|incil|ateist|müslüman|hristiyan)\b/i,
   /\b(öldür|intihar|bomba|silah|kan|işkence|yarala|döv|saldır)\b/i,
-  /\b(seks|porno|çıplak|yetişkin içerik)\b/i,
-  /\b(ünlü|magazin|dedikodu|tiktokçu|youtuber|şarkıcı|oyuncu)\b/i
+  /\b(seks|porno|çıplak|yetişkin içerik|küfür)\b/i,
+  /\b(magazin|dedikodu|tiktokçu|youtuber|fenomen|influencer|popçu|dizi oyuncusu|sosyal medya fenomeni)\b/i
 ];
 
 const REFUSAL_HINTS = [
@@ -146,6 +139,7 @@ function localFallback(userText: string) {
 }
 
 function cleanReply(value: string, userText: string): string {
+  // Kelime kesme (slice) kaldırıldı. Cümlelerin yarım kalması engellendi.
   const compact = value
     .replace(/\*\*/g, '')
     .replace(/\*/g, '')
@@ -154,16 +148,13 @@ function cleanReply(value: string, userText: string): string {
     .trim();
 
   if (!compact || compact.length < 3) return localFallback(userText);
-
-  const words = compact.split(/\s+/);
-  const wantsDetail = userText.length > 80 || /açıkla|anlat|neden|nasıl|detay|örnek|ne işe yarar/i.test(userText);
-  const limit = wantsDetail ? 72 : 42;
-  return words.slice(0, limit).join(' ');
+  return compact; 
 }
 
 async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
-  const preferredModel = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
-  const fallbackModels = ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b'];
+  // Groq'un güncel ve geçerli gerçek model isimleri eklendi.
+  const preferredModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  const fallbackModels = ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
   const models = [preferredModel, ...fallbackModels.filter((model) => model !== preferredModel)];
   let lastError = '';
 
@@ -171,16 +162,12 @@ async function requestGroqChat(apiKey: string, messages: ChatMessage[]) {
     const payload: Record<string, unknown> = {
       model,
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-      temperature: 0.62,
+      temperature: 0.65,
       top_p: 0.9,
-      max_completion_tokens: 300,
+      max_tokens: 350, // Cümle kesilmelerini önlemek için limit genişletildi
       presence_penalty: 0,
       frequency_penalty: 0.05
     };
-
-    if (model.startsWith('openai/gpt-oss')) {
-      payload.include_reasoning = false;
-    }
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -230,6 +217,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const response = await requestGroqChat(apiKey, messages);
+    
     if (!response.ok) {
       const detail = await response.text();
       console.error('Groq request failed:', detail);
@@ -243,7 +231,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error(error);
     return res.status(200).json({
-      text: 'Küçük bir bağlantı sorunu oldu; sorununu kısa yazarsan tekrar deneyelim.'
+      text: 'Küçük bir bağlantı sorunu oldu; bir kere daha deneyelim.'
     });
   }
 }
